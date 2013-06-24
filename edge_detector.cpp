@@ -40,10 +40,17 @@ class SimpleOpenNIViewer
     PointCloud::Ptr inlierCloud;
     Display * viewer;
     ImageDisplay * imageViewer;
+    std::string filename, directoryname;
+    bool doWrite, doRead;
 
     float fx, fy, u0, v0, pixel_size;
 
     SimpleOpenNIViewer (){
+        doWrite = true;
+        doRead = false;
+        filename = "pcd_frames/sample";
+
+
         colors.push_back( cv::Vec3i ( 255,   0,   0 ));
         colors.push_back( cv::Vec3i ( 0  , 255,   0 ));
         colors.push_back( cv::Vec3i (   0,   0, 255 ));
@@ -80,6 +87,7 @@ class SimpleOpenNIViewer
         viewer->addCoordinateSystem (0.5);
         viewer->initCameraParameters();
         viewer->setCameraPosition(0,0,-1.3, 0,-1,0);
+
     }
 
     //create a viewer that holds lines and a point cloud.
@@ -111,14 +119,30 @@ class SimpleOpenNIViewer
             u0 = cloud->width / 2;
             v0 = cloud->height / 2;
         }
+        if ( doWrite ){
+            savePointCloud( *cloud );
+        }
+
         std::vector< LinePosArray > linePositions;
-        segment( cloud, linePositions, 50000 );
-        updateViewer( cloud, linePositions );
+
+        
+        if ( doRead ){
+            PointCloud::Ptr readCloud (new PointCloud );
+            readPointCloud( readCloud );
+
+            segment( readCloud, linePositions, 50000 );
+            updateViewer( readCloud, linePositions );
+        }
+        else{
+            segment( cloud, linePositions, 50000 );
+            updateViewer( cloud, linePositions );
+        }
         viewer->spinOnce (100);
       }
 
       cout << "ended Call back\n";
     }
+
 
 
     void run ()
@@ -142,6 +166,31 @@ class SimpleOpenNIViewer
       }
       
       interface->stop();
+    }
+
+
+    void savePointCloud(const PointCloud & cloud)
+    {
+        static int index = 0;
+        pcl::io::savePCDFileBinary(filename + 
+                                   boost::to_string( index ) + ".pcd"
+                                   , cloud);
+        index ++;
+    }
+
+    
+    void readPointCloud(PointCloud::Ptr & cloud)
+    {
+        static int index = 0;
+        if (pcl::io::loadPCDFile<Point> (filename + 
+                                         boost::to_string( index )
+                                         +".pcd", *cloud) == -1)
+        {
+            cerr << "Couldn't read file "+filename+
+                     boost::to_string( index ) +".pcd" << endl;
+            exit(-1);
+        }
+        index ++;
     }
 
   private:
@@ -169,20 +218,30 @@ class SimpleOpenNIViewer
         pcl::ExtractIndices< Point > extractor;
         extractor.setInputCloud( cloud );
 
+
         pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
-        pcl::PointIndices::Ptr outliers (new pcl::PointIndices);
-        outliers = seg.getIndices();
-        cout << "Starting Length of outliers is " 
-             << outliers->indices.size() << "\n" ;
+        pcl::IndicesPtr outliers ( new std::vector<int> );
+        outliers->resize( cloud->height * cloud->width );
 
-        while( inlierCloud->width > size){
-            pcl::PointIndices::Ptr remaining( new PointCloud );
-            filterOutIndices( outliers, inliers, remaining );
+        for ( int i = 0; i < outliers->size(); i ++ ){
+            outliers->at( i ) = i;
+        }
 
-            outliers = extractor.getRemovedIndices();
+        std::vector<int> remaining;
+        //outliers = seg.getIndices();
+
+        
+        while( linePositions.size() < 2 ||
+               inliers->indices.size() > size ){
+            remaining.clear();
+
+            // move decl out of for loop
+            filterOutIndices( *outliers, inliers, remaining );
+            cout << "Remaining size: " << remaining.size() << "\n";
+            //no outliers = extractor.getRemovedIndices();
             seg.setIndices( outliers );
             seg.segment (*inliers, *coefficients);
-
+            
             //copy plane 
             if (inliers->indices.size () == 0)
             {
@@ -191,9 +250,9 @@ class SimpleOpenNIViewer
                 return;
             }
             
-            pcl::copyPointCloud<Point>(*cloud, 
-                                        inliers->indices,
-                                        *inlierCloud);
+            //pcl::copyPointCloud<Point>(*cloud, 
+              //                          inliers->indices,
+                //                        *inlierCloud);
 
 
             cv::Mat majorPlane = cv::Mat::zeros(cloud->height *
@@ -210,28 +269,29 @@ class SimpleOpenNIViewer
             cv::Mat cannyLineMat;
             LineArray lines;
             findLines( majorPlane, lines, cannyLineMat );
-            convertColor(cannyLineMat, inliers);  
+            //convertColor(cannyLineMat, inliers);  
             
             LinePosArray currentLinePos;
             linesToPositions(coefficients, lines, currentLinePos );
 
             linePositions.push_back( currentLinePos );
 
-            outliers = remaining;
+            *outliers = remaining;
         }
     }
 
 
-    void filterOutIndices( const pcl::PointIndices::ConstPtr & larger,
-                           const pcl::PointIndices::ConstPtr & remove,
-                           pcl::PointIndices::Ptr & final ){
+    void filterOutIndices( const std::vector< int > & larger,
+                           const pcl::PointIndices::Ptr & remove,
+                           std::vector< int > & final ){
         int j = 0;
-        for( int i = 0; i < larger->indices.size() ; i ++ ){
-            if ( larger->indices[i] == remove->indices[j] ){
+        for( int i = 0; i < larger.size() ; i ++ ){
+            if ( j < remove->indices.size() &&
+                 larger[i] == remove->indices[j] ){
                 j++;
             }
             else{
-                final->indices.push_back( larger->indices[i] );
+                final.push_back( larger[i] );
             }
         }
     }
