@@ -40,14 +40,25 @@ class SimpleOpenNIViewer
     PointCloud::Ptr inlierCloud;
     Display * viewer;
     ImageDisplay * imageViewer;
-    std::string filename, directoryname;
-    bool doWrite, doRead;
+    std::string filename;
 
-    float fx, fy, u0, v0, pixel_size;
+    const float deviceFocalLength;
+    const float pixel_size;
+    bool viewerIsInitialized, doWrite;
+    bool showImage;
 
-    SimpleOpenNIViewer (){
-        doWrite = true;
-        doRead = false;
+    float fx, fy, u0, v0;
+
+    SimpleOpenNIViewer () : deviceFocalLength( 530.551),
+                            pixel_size( 1.075 ),
+                            viewerIsInitialized( false ),
+                            doWrite( false ), showImage( false ),
+                            u0( -1), v0(-1)
+                            {
+
+        viewer = new Display;
+        imageViewer = new ImageDisplay;
+
         filename = "pcd_frames/sample";
 
 
@@ -61,32 +72,10 @@ class SimpleOpenNIViewer
         colors.push_back( cv::Vec3i ( 125, 255, 125 ));
         colors.push_back( cv::Vec3i ( 125, 125, 255 ));
 
-        pixel_size = 1.075;
-        
-        //these are initialized to invalid starting points for the 
-        //purposes of error checking
-        u0 = -1;
-        v0 = -1; 
-
-        PointCloud::Ptr temp(new PointCloud );
-        inlierCloud = temp;
-
-        viewer = new Display;
-        imageViewer = new ImageDisplay;
-        imageViewer->setPosition( 700, 10 );
-        imageViewer->setSize( 640, 480 );
-
+       
         //viewer->setBackgroundColor (0,0,0);
-        ColorHandler rgb(inlierCloud);
         //pcl::visualization::PointCloudColorHandlerCustom<Point>
             //inlierColor( inlierCloud, 255, 255, 0 );
-
-        viewer->addPointCloud<Point> (inlierCloud, rgb,  "cloud");
-        viewer->setPointCloudRenderingProperties 
-           (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "cloud");
-        viewer->addCoordinateSystem (0.5);
-        viewer->initCameraParameters();
-        viewer->setCameraPosition(0,0,-1.3, 0,-1,0);
 
     }
 
@@ -94,8 +83,11 @@ class SimpleOpenNIViewer
     void updateViewer( const PointCloud::ConstPtr &cloud,
                        const std::vector< LinePosArray > & planes )
     {
+        if ( !viewerIsInitialized ){
+            initViewer( cloud );
+        }
         viewer->removeAllShapes();
-        viewer->updatePointCloud( inlierCloud, "cloud");
+        viewer->updatePointCloud( cloud, "cloud");
         cout << "Number of Planes: " << planes.size() << endl;
 
         for( int i = 0; i < planes.size(); i ++ ){
@@ -110,40 +102,65 @@ class SimpleOpenNIViewer
             }
 
         }
-    }
+
+        viewer->spinOnce (100);
         
+    }
+    
+    void initViewer( const PointCloud::ConstPtr & cloud ){
+        u0 = cloud->width / 2;
+        v0 = cloud->height / 2;
+
+        ColorHandler rgb( cloud );   
+
+        viewer->addPointCloud<Point> ( cloud, rgb,  "cloud");
+        viewer->setPointCloudRenderingProperties 
+           (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "cloud");
+        viewer->addCoordinateSystem (0.5);
+        viewer->initCameraParameters();
+        viewer->setCameraPosition(0,0,-1.3, 0,-1,0);
+
+        imageViewer->setPosition( 700, 10 );
+        imageViewer->setSize( 640, 480 );
+        
+        viewerIsInitialized = true;
+
+    }
+    
     void cloud_cb_ (const PointCloud::ConstPtr &cloud)
     {
+
       if ( !viewer->wasStopped() ){
-        if ( u0 == -1 || v0 == -1 ){
-            u0 = cloud->width / 2;
-            v0 = cloud->height / 2;
-        }
         if ( doWrite ){
             savePointCloud( *cloud );
         }
 
         std::vector< LinePosArray > linePositions;
-
-        
-        if ( doRead ){
-            PointCloud::Ptr readCloud (new PointCloud );
-            readPointCloud( readCloud );
-
-            segment( readCloud, linePositions, 50000 );
-            updateViewer( readCloud, linePositions );
-        }
-        else{
-            segment( cloud, linePositions, 50000 );
-            updateViewer( cloud, linePositions );
-        }
-        viewer->spinOnce (100);
+        segment( cloud, linePositions, 50000 );
+        updateViewer( cloud, linePositions );
       }
 
       cout << "ended Call back\n";
     }
+    
 
+    //this program will run until the reader throws an error about 
+    //a non-existant file.
+    void runWithInputFile(){
 
+        while ( true ){
+            if ( !viewer->wasStopped() ){
+
+                std::vector< LinePosArray > linePositions;
+                PointCloud::Ptr cloud (new PointCloud );
+                readPointCloud( cloud );
+
+                segment( cloud, linePositions, 50000 );
+                updateViewer( cloud, linePositions );
+            }
+        }
+
+    }
 
     void run ()
     {
@@ -230,14 +247,14 @@ class SimpleOpenNIViewer
         std::vector<int> remaining;
         //outliers = seg.getIndices();
 
-        
+        //We get two planes, or the size of the inliers is reduced to
+        //a very low amout;
         while( linePositions.size() < 2 ||
                inliers->indices.size() > size ){
             remaining.clear();
 
             // move decl out of for loop
             filterOutIndices( *outliers, inliers, remaining );
-            cout << "Remaining size: " << remaining.size() << "\n";
             //no outliers = extractor.getRemovedIndices();
             seg.setIndices( outliers );
             seg.segment (*inliers, *coefficients);
@@ -325,31 +342,32 @@ class SimpleOpenNIViewer
             return;
         }
         
-        int size = 4 ;
-        cv::Mat kernel = cv::Mat::ones( size, size, CV_64F ); 
-        cv::dilate( dst, dst, kernel);
+        //int size = 4 ;
+        //cv::Mat kernel = cv::Mat::ones( size, size, CV_64F ); 
+        //cv::dilate( dst, dst, kernel);
 
         //dst, lines, rho_resolution, theta_resolution, threshold,
         //minLinLength, maxLineGap
-        cv::HoughLinesP(dst, lines, 8, CV_PI/180, 200, 100, 4 );
+        cv::HoughLinesP(dst, lines, 8, CV_PI/180, 40, 75, 4 );
         
-        cv::Mat cdst;
-        cv::cvtColor(src, cdst, CV_GRAY2BGR);
+        //draw the lines;
+        if ( showImage ){     
+            cv::Mat cdst;
+            cv::cvtColor(src, cdst, CV_GRAY2BGR);
 
-        for( size_t i = 0; i < lines.size(); i++ )
-        {
-            cv::Vec4i l = lines[i];
-            cv::line( cdst, cv::Point(l[0], l[1]),
-                            cv::Point(l[2], l[3]),
-                            cv::Scalar(0,0,255),
-                            3, CV_AA);
-        }
-        
-        imageViewer->showRGBImage( cdst.data, cdst.cols, cdst.rows );
-        //cv::imshow("foo", cdst);
-        //cv::waitKey(30);
-                
+            for( size_t i = 0; i < lines.size(); i++ )
+            {
+                cv::Vec4i l = lines[i];
+                cv::line( cdst, cv::Point(l[0], l[1]),
+                                cv::Point(l[2], l[3]),
+                                cv::Scalar(0,0,255),
+                                3, CV_AA);
+            }
+            imageViewer->showRGBImage( cdst.data, cdst.cols, cdst.rows );
+        }          
     }
+
+
     void convertColor(cv::Mat & mat, pcl::PointIndices::Ptr inliers)
     {
         cv::Mat newMat = mat.reshape( 1, mat.cols * mat.rows );
@@ -406,11 +424,69 @@ class SimpleOpenNIViewer
     }
 };
 
-int main ()
+void printUsage(){
+    cout << "Usage: ./edge_detector <mode: [1, 3]> <filename>\n"
+         << "This program can run with 0, 1, or 2 arguements\n"
+         << "With no arguments, this program will not write any data and"
+            << " will read data from a device\n"
+         << "If the first argument is a 1, then the program will function "
+            << "like it would with no arguments\n"
+         << "If the first argument is 2, then the program will write the "
+            << "Point Cloud data to a file\n"
+         << "If the first argument is 3, then the program will read "
+            << "Point Cloud data from a file\n"
+         << "The third argument sets the filename to be read or written to\n";
+}
+
+int main (int argc, char * argv[])
 {
+
   SimpleOpenNIViewer v;
-  v.run ();
+
+  //if there are no arguments, print the usage and run the file;
+  if ( argc == 1 ){
+      v.run();
+      printUsage();
+  }
   
+  //if there are two or three arguments, execute the code normally;
+  else if (argc <= 4){
+      //if there are two extra arguments, then set the 
+      if ( argc >= 3 ){
+          v.filename = argv[2];
+      }
+
+      if ( argc == 4 ){
+        int value = atoi( argv[1] );
+        if (value == 1 ){
+            v.showImage = false;
+        }
+      }
+
+      
+      int value = atoi( argv[1] );
+      if (value == 1 ){
+          cout << "Running edge detection" << "\n";
+          v.run();
+      }
+      else if ( value == 2 ){
+          cout << "Running edge detection and saving data to the file: "
+               << v.filename << "\n";
+          v.doWrite = true;
+          v.run();
+      }
+      else if( value == 3 ){
+          cout << "Running edge detection with the data from the file: "
+               << v.filename << "\n";
+          v.runWithInputFile();
+      }
+      else {
+          printUsage();
+      }
+  }
+  else{
+      printUsage();
+  }
   
   return 0;
 }
