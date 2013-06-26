@@ -11,7 +11,12 @@ include_directories(${OPENCV_INCLUDE_DIRS})
 include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
-add_executable (edge_detector edge_detector.cpp)
 
-target_link_libraries (edge_detector ${PCL_LIBRARIES})
-target_link_libraries (edge_detector ${OPENCV_LDFLAGS})
+set(HDRS plane_segmenter.h )
+set(SRCS plane_segmenter.cpp )
+
+add_library( plane_segmenter ${HDRS} ${SRCS} )
+add_executable (edge_detector ${HDRS} edge_detector.cpp)
+
+set( LIBS plane_segmenter ${PCL_LIBRARIES} ${OPENCV_LDFLAGS} )
+target_link_libraries (edge_detector ${LIBS} )
