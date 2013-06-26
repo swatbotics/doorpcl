@@ -1,6 +1,9 @@
+#include <iostream>
+#include <exception>
+#include <string>
+
 #include <pcl/io/openni_grabber.h>
 #include <pcl/visualization/cloud_viewer.h>
-#include <iostream>
 #include <pcl/ModelCoefficients.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
@@ -8,16 +11,13 @@
 #include <pcl/sample_consensus/model_types.h>
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/visualization/pcl_visualizer.h>
-#include <boost/thread/thread.hpp>
-#include <exception>
+#include <pcl/visualization/image_viewer.h>
 #include <pcl/filters/filter.h>
+#include <pcl/common/common_headers.h>
+
+#include <boost/thread/thread.hpp>
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/core/core.hpp"
-#include <pcl/common/common_headers.h>
-#include <pcl/features/normal_3d.h>
-#include "opencv2/highgui/highgui.hpp"
-#include <pcl/visualization/image_viewer.h>
-#include <pcl/filters/extract_indices.h>
 
 class SimpleOpenNIViewer
 {
@@ -35,9 +35,10 @@ class SimpleOpenNIViewer
     //pcl::visualization::CloudViewer viewer;
     //SimpleOpenNIViewer () : viewer ("PCL OpenNI Viewer") {}
 
+    //this holds a set of colors for visualization
     std::vector< cv::Vec3i > colors;
 
-    PointCloud::Ptr inlierCloud;
+    //
     Display * viewer;
     ImageDisplay * imageViewer;
     std::string filename;
@@ -56,7 +57,7 @@ class SimpleOpenNIViewer
                             u0( -1), v0(-1)
                             {
 
-        viewer = new Display;
+        viewer = new Display( "Edge Detector" ) ;
         imageViewer = new ImageDisplay;
 
         filename = "pcd_frames/sample";
@@ -71,11 +72,6 @@ class SimpleOpenNIViewer
         colors.push_back( cv::Vec3i ( 255, 125, 125 ));
         colors.push_back( cv::Vec3i ( 125, 255, 125 ));
         colors.push_back( cv::Vec3i ( 125, 125, 255 ));
-
-       
-        //viewer->setBackgroundColor (0,0,0);
-        //pcl::visualization::PointCloudColorHandlerCustom<Point>
-            //inlierColor( inlierCloud, 255, 255, 0 );
 
     }
 
@@ -165,6 +161,7 @@ class SimpleOpenNIViewer
     void run ()
     {
 
+#ifndef __APPLE__ 
       pcl::OpenNIGrabber* interface = new pcl::OpenNIGrabber();
       boost::function<
           void (const PointCloud::ConstPtr&)> f =
@@ -183,6 +180,8 @@ class SimpleOpenNIViewer
       }
       
       interface->stop();
+
+#endif
     }
 
 
@@ -210,7 +209,7 @@ class SimpleOpenNIViewer
         index ++;
     }
 
-  private:
+private:
 
     
     void segment(const PointCloud::ConstPtr &cloud, 
@@ -218,8 +217,9 @@ class SimpleOpenNIViewer
                  int size)
     {   
 
-        pcl::ModelCoefficients::Ptr coefficients
-                                             (new pcl::ModelCoefficients);
+        PointCloud::Ptr inlierCloud (new PointCloud);
+        
+        pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
 
         // Create the segmentation object
         pcl::SACSegmentation<Point> seg;
@@ -232,10 +232,9 @@ class SimpleOpenNIViewer
 
         seg.setInputCloud ( cloud->makeShared() );
 
-        pcl::ExtractIndices< Point > extractor;
-        extractor.setInputCloud( cloud );
-
-
+        
+        //initialize the indices containers, set outliers to be all of the
+        //points inside the point cloud. 
         pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
         pcl::IndicesPtr outliers ( new std::vector<int> );
         outliers->resize( cloud->height * cloud->width );
@@ -244,26 +243,23 @@ class SimpleOpenNIViewer
             outliers->at( i ) = i;
         }
 
-        std::vector<int> remaining;
-        //outliers = seg.getIndices();
 
         //We get two planes, or the size of the inliers is reduced to
         //a very low amout;
         while( linePositions.size() < 2 ||
                inliers->indices.size() > size ){
-            remaining.clear();
 
-            // move decl out of for loop
-            filterOutIndices( *outliers, inliers, remaining );
-            //no outliers = extractor.getRemovedIndices();
+            //this performs segmentation on only the indices that are 
+            //in outliers
             seg.setIndices( outliers );
             seg.segment (*inliers, *coefficients);
             
             //copy plane 
             if (inliers->indices.size () == 0)
             {
-              PCL_ERROR("Could not estimate a plane for the given data.");
-                cout << "Invalid cloud data" << endl;
+                if ( linePositions.size() == 0 ){
+                    PCL_ERROR("Could not estimate a plane for the given data.");
+                }
                 return;
             }
             
@@ -272,49 +268,57 @@ class SimpleOpenNIViewer
                 //                        *inlierCloud);
 
 
+            //create a binary picture from the points in inliers.
             cv::Mat majorPlane = cv::Mat::zeros(cloud->height *
                                                 cloud->width,
                                                 1 , CV_8UC1 );
-            cloudToMat(inliers, majorPlane );
-      
+            cloudToMat(inliers->indices, majorPlane );
+            //reshape the matrix into the shape of the image and run the
+            //canny edge detector on the resulting image.
             majorPlane.rows = cloud->height;
             majorPlane.cols = cloud->width;
-
-            //std::cout << "majorPlane is " << majorPlane.cols <<
-            //             "x" << majorPlane.rows << "\n";
 
             cv::Mat cannyLineMat;
             LineArray lines;
             findLines( majorPlane, lines, cannyLineMat );
+
             //convertColor(cannyLineMat, inliers);  
             
+            //transforms the lines in the plane into lines in space.
             LinePosArray currentLinePos;
             linesToPositions(coefficients, lines, currentLinePos );
 
             linePositions.push_back( currentLinePos );
 
-            *outliers = remaining;
+            filterOutIndices( *outliers, inliers->indices );
+
         }
     }
 
 
-    void filterOutIndices( const std::vector< int > & larger,
-                           const pcl::PointIndices::Ptr & remove,
-                           std::vector< int > & final ){
+    //this modifies the vector "larger" in place, and resizes it.
+    //This function assumes that both structures hold integer
+    //values that get larger. 
+    inline void filterOutIndices( std::vector< int > & larger,
+                           const std::vector<int> & remove){
         int j = 0;
+        int k = 0;
         for( int i = 0; i < larger.size() ; i ++ ){
-            if ( j < remove->indices.size() &&
-                 larger[i] == remove->indices[j] ){
+            if ( j < remove.size() &&
+                 larger[i] == remove[j] ){
                 j++;
             }
             else{
-                final.push_back( larger[i] );
+                larger[k] = larger[i];
+                k ++;
             }
         }
+
+        larger.resize( k );
     }
 
 
-    void cloudToMat(const pcl::PointIndices::Ptr & validPoints,
+    inline void cloudToMat(const std::vector< int > & validPoints,
                           cv::Mat &mat)
     {
       //set the values of mat that correspond to being on the major
@@ -322,14 +326,14 @@ class SimpleOpenNIViewer
       //These values should be 1, we will end up with a binary matrix:
       //a value of 1 is on the plane,
       //a value of 0 is off the plane.
-      for (int i=0; i < validPoints->indices.size(); i++){
-	    int index = validPoints->indices[i];
-        mat.at<uint8_t>( index, 1 ) = 255;
+      for (int i=0; i < validPoints.size(); i++){
+            mat.at<uint8_t>( validPoints[i], 1 ) = 255;
 	  }
       
     }
     
-    void findLines(cv::Mat & src, LineArray & lines, cv::Mat & dst)
+
+    inline void findLines(cv::Mat & src, LineArray & lines, cv::Mat & dst)
     {
         
         try{
@@ -337,7 +341,7 @@ class SimpleOpenNIViewer
             src.copyTo(dst);
             cv::Canny(dst, dst, 25, 230, 3);
         }
-        catch ( exception & e ){
+        catch ( std::exception & e ){
             cout << "Error with canny edge detector" << e.what() << "\n";
             return;
         }
@@ -368,7 +372,9 @@ class SimpleOpenNIViewer
     }
 
 
-    void convertColor(cv::Mat & mat, pcl::PointIndices::Ptr inliers)
+    inline void convertColor( PointCloud::Ptr & cloud,
+                       cv::Mat & mat,
+                       pcl::PointIndices::Ptr inliers)
     {
         cv::Mat newMat = mat.reshape( 1, mat.cols * mat.rows );
         
@@ -380,14 +386,14 @@ class SimpleOpenNIViewer
             uint8_t r(255), g( 255 - colorVal ), b( 255 - colorVal );
             uint32_t rgb = (static_cast<uint32_t>(r) << 16 |
                  static_cast<uint32_t>(g) << 8 | static_cast<uint32_t>(b));
-            inlierCloud->points[i].rgb = *reinterpret_cast<float*>(&rgb);
+            cloud->points[i].rgb = *reinterpret_cast<float*>(&rgb);
         }
     }
 
     //this solves for the position of all of the line endpoint in the
     //plane by solving a matrix equation of the form Ax = b.
 
-    void linesToPositions( const pcl::ModelCoefficients::Ptr & coeffs,
+    inline void linesToPositions( const pcl::ModelCoefficients::Ptr & coeffs,
                            const LineArray & lines, 
                                  LinePosArray & linePositions
                            ){
