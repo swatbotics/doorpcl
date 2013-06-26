@@ -52,7 +52,7 @@ class SimpleOpenNIViewer
     SimpleOpenNIViewer () : deviceFocalLength( 530.551),
                             pixel_size( 1.075 ),
                             viewerIsInitialized( false ),
-                            doWrite( false ), showImage( false ),
+                            doWrite( false ), showImage( true ),
                             u0( -1), v0(-1)
                             {
 
@@ -71,6 +71,13 @@ class SimpleOpenNIViewer
         colors.push_back( cv::Vec3i ( 255, 125, 125 ));
         colors.push_back( cv::Vec3i ( 125, 255, 125 ));
         colors.push_back( cv::Vec3i ( 125, 125, 255 ));
+
+        viewer->addCoordinateSystem (0.5);
+        viewer->initCameraParameters();
+        viewer->setCameraPosition(0,0,-1.3, 0,-1,0);
+
+        imageViewer->setPosition( 700, 10 );
+        imageViewer->setSize( 640, 480 );
 
        
         //viewer->setBackgroundColor (0,0,0);
@@ -115,13 +122,7 @@ class SimpleOpenNIViewer
 
         viewer->addPointCloud<Point> ( cloud, rgb,  "cloud");
         viewer->setPointCloudRenderingProperties 
-           (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "cloud");
-        viewer->addCoordinateSystem (0.5);
-        viewer->initCameraParameters();
-        viewer->setCameraPosition(0,0,-1.3, 0,-1,0);
-
-        imageViewer->setPosition( 700, 10 );
-        imageViewer->setSize( 640, 480 );
+           (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 0.5, "cloud");
         
         viewerIsInitialized = true;
 
@@ -129,15 +130,15 @@ class SimpleOpenNIViewer
     
     void cloud_cb_ (const PointCloud::ConstPtr &cloud)
     {
-
-      if ( !viewer->wasStopped() ){
         if ( doWrite ){
             savePointCloud( *cloud );
         }
 
         std::vector< LinePosArray > linePositions;
-        segment( cloud, linePositions, 50000 );
+        //segment( cloud, linePositions, 50000 );
         updateViewer( cloud, linePositions );
+
+      if ( !viewer->wasStopped() ){
       }
 
       cout << "ended Call back\n";
@@ -228,7 +229,7 @@ class SimpleOpenNIViewer
         // Mandatory
         seg.setModelType (pcl::SACMODEL_PLANE);
         seg.setMethodType (pcl::SAC_RANSAC);
-        seg.setDistanceThreshold (0.03);
+        seg.setDistanceThreshold (0.075);
 
         seg.setInputCloud ( cloud->makeShared() );
 
@@ -262,16 +263,12 @@ class SimpleOpenNIViewer
             //copy plane 
             if (inliers->indices.size () == 0)
             {
-              PCL_ERROR("Could not estimate a plane for the given data.");
-                cout << "Invalid cloud data" << endl;
+                if ( linePositions.size() == 0 ){
+                    PCL_ERROR("Could not estimate a plane for the data.");
+                }
                 return;
             }
             
-            //pcl::copyPointCloud<Point>(*cloud, 
-              //                          inliers->indices,
-                //                        *inlierCloud);
-
-
             cv::Mat majorPlane = cv::Mat::zeros(cloud->height *
                                                 cloud->width,
                                                 1 , CV_8UC1 );
@@ -342,14 +339,18 @@ class SimpleOpenNIViewer
             return;
         }
         
+
+        //dst, lines, rho_resolution, theta_resolution, threshold,
+        //minLinLength, maxLineGap
+        cv::HoughLinesP(dst, lines, 0.5, CV_PI/180, 40, 65, 18 );
+        
+
+        //the below code will increase the size of the hough lines
+        //to make the line detection more noticeable.
         //int size = 4 ;
         //cv::Mat kernel = cv::Mat::ones( size, size, CV_64F ); 
         //cv::dilate( dst, dst, kernel);
 
-        //dst, lines, rho_resolution, theta_resolution, threshold,
-        //minLinLength, maxLineGap
-        cv::HoughLinesP(dst, lines, 8, CV_PI/180, 40, 75, 4 );
-        
         //draw the lines;
         if ( showImage ){     
             cv::Mat cdst;
