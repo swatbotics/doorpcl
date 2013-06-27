@@ -15,8 +15,8 @@ PlaneSegmenter::PlaneSegmenter( int maxNumPlanes, int minSize,
 
     HL_rhoRes = 8;
     HL_thetaRes = CV_PI/180;
-    HL_threshold = 40;
-    HL_minLineLength = 75;
+    HL_threshold = 20;
+    HL_minLineLength = 30;
     HL_minLineGap = 4;
 
     haveSetCamera = false;
@@ -151,7 +151,8 @@ inline void PlaneSegmenter::cloudToMat(const std::vector< int > & validPoints,
 inline void PlaneSegmenter::findLines(cv::Mat & src, LineArray & lines,
                                       pcl::visualization::ImageViewer * viewer )
 {
-    
+     
+    cv::Mat dst;
     try{
         //TODO : is the copy necessary
         //cv::blur( src, dst, cv::Size(5,5) );
@@ -172,10 +173,11 @@ inline void PlaneSegmenter::findLines(cv::Mat & src, LineArray & lines,
     cv::HoughLinesP(dst, lines, HL_rhoRes, HL_thetaRes, HL_threshold,
                     HL_minLineLength, HL_minLineGap);
     
+    cout << "Number of lines: " << lines.size() << endl;
     //draw the lines;
     if ( viewer != NULL ){     
         cv::Mat cdst;
-        cv::cvtColor(src, cdst, CV_GRAY2BGR);
+        cv::cvtColor(dst, cdst, CV_GRAY2BGR);
 
         for( size_t i = 0; i < lines.size(); i++ )
         {

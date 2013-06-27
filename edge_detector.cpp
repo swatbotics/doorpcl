@@ -78,8 +78,8 @@ class SimpleOpenNIViewer
         //cloud_viewer->showCloud( cloud );
         
         line_viewer->removeAllShapes();
-        viewer->updatePointCloud( cloud, "cloud");
-        //cout << "Number of Planes: " << planes.size() << endl;
+        line_viewer->updatePointCloud( cloud, "cloud");
+        cout << "Number of Planes: " << planes.size() << endl;
 
         for( int i = 0; i < planes.size(); i ++ ){
             const LinePosArray lines = planes[i];
@@ -134,7 +134,7 @@ class SimpleOpenNIViewer
             }
 
             std::vector< LinePosArray > planes;
-            segmenter.segment( cloud, planes );
+            segmenter.segment( cloud, planes, image_viewer );
             updateViewer( cloud, planes );
         }
 
