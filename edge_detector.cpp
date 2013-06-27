@@ -111,6 +111,7 @@ class SimpleOpenNIViewer
         line_viewer->addPointCloud<Point> ( cloud, rgb,  "cloud");
         line_viewer->setPointCloudRenderingProperties 
            (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "cloud");
+
         line_viewer->addCoordinateSystem (0.5);
         line_viewer->initCameraParameters();
         line_viewer->setCameraPosition(0,0,-1.3, 0,-1,0);
@@ -127,8 +128,6 @@ class SimpleOpenNIViewer
         if ( !viewerIsInitialized ){
             initViewer( cloud );
         }
-
-        if ( !line_viewer->wasStopped() ){
             if ( doWrite ){
                 savePointCloud( *cloud );
             }
@@ -136,6 +135,8 @@ class SimpleOpenNIViewer
             std::vector< LinePosArray > planes;
             segmenter.segment( cloud, planes, image_viewer );
             updateViewer( cloud, planes );
+
+        if ( !line_viewer->wasStopped() ){
         }
 
       cout << "ended Call back\n";

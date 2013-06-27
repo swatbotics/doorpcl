@@ -36,7 +36,7 @@ public:
                   pcl::visualization::ImageViewer * viewer=NULL  );
 
     void setHoughLines( float rho, float theta, int threshold,
-                                    int minLineLength, int minLineGap);
+                                    int minLineLength, int maxLineGap);
 
     void setCameraIntrinsics( float focus_x, float focus_y,
                               float origin_x, float origin_y );
@@ -48,7 +48,7 @@ private:
 
     //these variables control the parameters of the HoughLines function.
     float HL_rhoRes, HL_thetaRes;
-    int HL_threshold, HL_minLineLength, HL_minLineGap ;
+    int HL_threshold, HL_minLineLength, HL_maxLineGap ;
 
     //these are the intrinsics of the camera
     float fx, fy, u0, v0;

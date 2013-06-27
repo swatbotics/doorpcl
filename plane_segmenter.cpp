@@ -13,11 +13,11 @@ PlaneSegmenter::PlaneSegmenter( int maxNumPlanes, int minSize,
     seg.setMethodType (pcl::SAC_RANSAC);
     seg.setDistanceThreshold ( threshold );
 
-    HL_rhoRes = 8;
-    HL_thetaRes = CV_PI/180;
-    HL_threshold = 20;
-    HL_minLineLength = 30;
-    HL_minLineGap = 4;
+    HL_rhoRes = 1;
+    HL_thetaRes = CV_PI/360;
+    HL_threshold = 40;
+    HL_minLineLength = 45;
+    HL_maxLineGap = 25;
 
     haveSetCamera = false;
 
@@ -37,13 +37,13 @@ void PlaneSegmenter::setCameraIntrinsics( float focus_x, float focus_y,
 
 
 void PlaneSegmenter::setHoughLines( float rho, float theta, int threshold,
-                                    int minLineLength, int minLineGap){
+                                    int minLineLength, int maxLineGap){
 
     HL_rhoRes = rho;
     HL_thetaRes = theta;
     HL_threshold = threshold;
     HL_minLineLength = minLineLength;
-    HL_minLineGap = minLineGap;
+    HL_maxLineGap = maxLineGap;
 }
 
 
@@ -154,9 +154,15 @@ inline void PlaneSegmenter::findLines(cv::Mat & src, LineArray & lines,
      
     cv::Mat dst;
     try{
-        //TODO : is the copy necessary
-        //cv::blur( src, dst, cv::Size(5,5) );
+        //TODO : find out why the copy is necessary: For some reason, without the copy, the canny edge detector does not work.
         src.copyTo(dst);
+
+        //this filter cleans up the noise from the sensor.
+        int size = 6 ;
+        cv::Mat kernel = cv::Mat::ones( size, size, CV_64F ); 
+        cv::dilate( dst, dst, kernel);
+        cv::erode( dst, dst, kernel );
+
         cv::Canny(dst, dst, 25, 230, 3);
     }
     catch ( std::exception & e ){
@@ -164,14 +170,11 @@ inline void PlaneSegmenter::findLines(cv::Mat & src, LineArray & lines,
         return;
     }
     
-    //int size = 4 ;
-    //cv::Mat kernel = cv::Mat::ones( size, size, CV_64F ); 
-    //cv::dilate( dst, dst, kernel);
 
     //dst, lines, rho_resolution, theta_resolution, threshold,
     //minLinLength, maxLineGap
     cv::HoughLinesP(dst, lines, HL_rhoRes, HL_thetaRes, HL_threshold,
-                    HL_minLineLength, HL_minLineGap);
+                    HL_minLineLength, HL_maxLineGap);
     
     cout << "Number of lines: " << lines.size() << endl;
     //draw the lines;
