@@ -18,10 +18,8 @@ class SimpleOpenNIViewer
     typedef pcl::PointXYZRGBA Point;  
     typedef pcl::PointCloud<Point> PointCloud;
     typedef std::vector< cv::Vec4i > LineArray;
-    typedef pcl::visualization::PCLVisualizer Display;
     typedef pcl::visualization::PointCloudColorHandlerRGBField<Point> 
                 ColorHandler;
-    typedef pcl::visualization::ImageViewer ImageDisplay;
     typedef std::vector< pcl::PointXYZ > LinePosArray;
 
     //pcl::visualization::CloudViewer viewer;
@@ -31,8 +29,10 @@ class SimpleOpenNIViewer
     std::vector< cv::Vec3i > colors;
 
     //
-    Display * viewer;
-    ImageDisplay * imageViewer;
+    pcl::visualization::PCLVisualizer * line_viewer;
+    pcl::visualization::CloudViewer * cloud_viewer;
+    pcl::visualization::ImageViewer * image_viewer;
+
     std::string filename;
 
     const float deviceFocalLength;
@@ -51,8 +51,9 @@ class SimpleOpenNIViewer
                             u0( -1), v0(-1)
                             {
 
-        viewer = new Display( "Edge Detector" ) ;
-        imageViewer = new ImageDisplay;
+        line_viewer = new pcl::visualization::PCLVisualizer( "Line Viewer" ) ;
+        cloud_viewer = new pcl::visualization::CloudViewer( "Cloud Viewer" );
+        image_viewer = new pcl::visualization::ImageViewer( "Image Viewer" );
 
         filename = "pcd_frames/sample";
 
@@ -73,12 +74,12 @@ class SimpleOpenNIViewer
     void updateViewer( const PointCloud::ConstPtr &cloud,
                        const std::vector< LinePosArray > & planes )
     {
-        if ( !viewerIsInitialized ){
-            initViewer( cloud );
-        }
-        viewer->removeAllShapes();
-        viewer->updatePointCloud( cloud, "cloud");
-        cout << "Number of Planes: " << planes.size() << endl;
+
+        cloud_viewer->showCloud( cloud );
+        
+        line_viewer->removeAllShapes();
+        //viewer->updatePointCloud( cloud, "cloud");
+        //cout << "Number of Planes: " << planes.size() << endl;
 
         for( int i = 0; i < planes.size(); i ++ ){
             const LinePosArray lines = planes[i];
@@ -87,33 +88,37 @@ class SimpleOpenNIViewer
                 const pcl::PointXYZ start = lines[ j ];
                 const pcl::PointXYZ end   = lines[ j+1 ];
                 
-                cv::Vec3i color = colors[i];
-                viewer->addLine(start, end,
+                cv::Vec3i color = colors[ i % colors.size() ];
+                line_viewer->addLine(start, end,
                                 color[0], color[1], color[2],
                                 "line" +  boost::to_string( j*100 +i ) );
             }
 
         }
 
-        viewer->spinOnce (100);
+        line_viewer->spinOnce (100);
         
     }
     
     void initViewer( const PointCloud::ConstPtr & cloud ){
         u0 = cloud->width / 2;
         v0 = cloud->height / 2;
+        
+        segmenter.setCameraIntrinsics( deviceFocalLength, deviceFocalLength,
+                                       u0, v0 );
+        //ColorHandler rgb( cloud );   
 
-        ColorHandler rgb( cloud );   
-
-        viewer->addPointCloud<Point> ( cloud, rgb,  "cloud");
-        viewer->setPointCloudRenderingProperties 
+        /*
+        line_viewer->addPointCloud<Point> ( cloud, rgb,  "cloud");
+        line_viewer->setPointCloudRenderingProperties 
            (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "cloud");
-        viewer->addCoordinateSystem (0.5);
-        viewer->initCameraParameters();
-        viewer->setCameraPosition(0,0,-1.3, 0,-1,0);
+        */
+        line_viewer->addCoordinateSystem (0.5);
+        line_viewer->initCameraParameters();
+        line_viewer->setCameraPosition(0,0,-1.3, 0,-1,0);
 
-        imageViewer->setPosition( 700, 10 );
-        imageViewer->setSize( 640, 480 );
+        image_viewer->setPosition( 700, 10 );
+        image_viewer->setSize( 640, 480 );
         
         viewerIsInitialized = true;
 
@@ -125,7 +130,7 @@ class SimpleOpenNIViewer
             initViewer( cloud );
         }
 
-        if ( !viewer->wasStopped() ){
+        if ( !line_viewer->wasStopped() ){
             if ( doWrite ){
                 savePointCloud( *cloud );
             }
@@ -143,7 +148,7 @@ class SimpleOpenNIViewer
     //a non-existant file.
     void runWithInputFile(){
         while ( true ){
-            if ( !viewer->wasStopped() ){
+            if ( !line_viewer->wasStopped() ){
 
                 std::vector< LinePosArray > planes;
                 PointCloud::Ptr cloud (new PointCloud );

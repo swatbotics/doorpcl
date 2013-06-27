@@ -32,7 +32,8 @@ public:
                    bool optimize=false, float threshold=0.03 );
 
     void segment(const PointCloud::ConstPtr &cloud, 
-                 std::vector< LinePosArray > & linePositions );
+                 std::vector< LinePosArray > & linePositions,
+                  pcl::visualization::ImageViewer * viewer=NULL  );
 
     void setHoughLines( float rho, float theta, int threshold,
                                     int minLineLength, int minLineGap);
@@ -72,7 +73,7 @@ private:
     //This takes an image (preferably a binary image) and performs the canny
     //edge detection algorithm. Then a houghLine algorithm is run to extract lines
     inline void findLines(cv::Mat & src, LineArray & lines, cv::Mat & dst,
-                          pcl::visualization::ImageViewer * viewer=NULL );
+                          pcl::visualization::ImageViewer * viewer );
     
 
     //this takes the equation of a plane (Ax + By + Cz + D = 0) as coeffs,

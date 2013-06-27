@@ -48,7 +48,8 @@ void PlaneSegmenter::setHoughLines( float rho, float theta, int threshold,
 
 
 void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud, 
-                             std::vector< LinePosArray > & linePositions ) 
+                             std::vector< LinePosArray > & linePositions,
+                             pcl::visualization::ImageViewer * viewer ) 
 {   
 
     assert( haveSetCamera );
@@ -98,7 +99,7 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
 
         cv::Mat cannyLineMat;
         LineArray lines;
-        findLines( majorPlane, lines, cannyLineMat );
+        findLines( majorPlane, lines, cannyLineMat, viewer );
 
         //convertColor(cannyLineMat, inliers);  
         
