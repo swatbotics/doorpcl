@@ -30,7 +30,7 @@ class SimpleOpenNIViewer
 
     //
     pcl::visualization::PCLVisualizer * line_viewer;
-    pcl::visualization::CloudViewer * cloud_viewer;
+    //pcl::visualization::CloudViewer * cloud_viewer;
     pcl::visualization::ImageViewer * image_viewer;
 
     std::string filename;
@@ -52,7 +52,7 @@ class SimpleOpenNIViewer
                             {
 
         line_viewer = new pcl::visualization::PCLVisualizer( "Line Viewer" ) ;
-        cloud_viewer = new pcl::visualization::CloudViewer( "Cloud Viewer" );
+        //cloud_viewer = new pcl::visualization::CloudViewer( "Cloud Viewer" );
         image_viewer = new pcl::visualization::ImageViewer( "Image Viewer" );
 
         filename = "pcd_frames/sample";
@@ -75,10 +75,10 @@ class SimpleOpenNIViewer
                        const std::vector< LinePosArray > & planes )
     {
 
-        cloud_viewer->showCloud( cloud );
+        //cloud_viewer->showCloud( cloud );
         
         line_viewer->removeAllShapes();
-        //viewer->updatePointCloud( cloud, "cloud");
+        viewer->updatePointCloud( cloud, "cloud");
         //cout << "Number of Planes: " << planes.size() << endl;
 
         for( int i = 0; i < planes.size(); i ++ ){
@@ -106,13 +106,11 @@ class SimpleOpenNIViewer
         
         segmenter.setCameraIntrinsics( deviceFocalLength, deviceFocalLength,
                                        u0, v0 );
-        //ColorHandler rgb( cloud );   
+        ColorHandler rgb( cloud );   
 
-        /*
         line_viewer->addPointCloud<Point> ( cloud, rgb,  "cloud");
         line_viewer->setPointCloudRenderingProperties 
            (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "cloud");
-        */
         line_viewer->addCoordinateSystem (0.5);
         line_viewer->initCameraParameters();
         line_viewer->setCameraPosition(0,0,-1.3, 0,-1,0);
@@ -183,7 +181,7 @@ class SimpleOpenNIViewer
       
       interface->start ();
 
-      while (!viewer->wasStopped())
+      while (!line_viewer->wasStopped())
       {
         boost::this_thread::sleep (boost::posix_time::seconds (1));
       }

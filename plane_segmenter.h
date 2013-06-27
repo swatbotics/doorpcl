@@ -72,7 +72,7 @@ private:
                            cv::Mat &mat                            );
     //This takes an image (preferably a binary image) and performs the canny
     //edge detection algorithm. Then a houghLine algorithm is run to extract lines
-    inline void findLines(cv::Mat & src, LineArray & lines, cv::Mat & dst,
+    inline void findLines(cv::Mat & src, LineArray & lines,
                           pcl::visualization::ImageViewer * viewer );
     
 

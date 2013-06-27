@@ -97,9 +97,8 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
         majorPlane.rows = cloud->height;
         majorPlane.cols = cloud->width;
 
-        cv::Mat cannyLineMat;
         LineArray lines;
-        findLines( majorPlane, lines, cannyLineMat, viewer );
+        findLines( majorPlane, lines, viewer );
 
         //convertColor(cannyLineMat, inliers);  
         
@@ -150,7 +149,6 @@ inline void PlaneSegmenter::cloudToMat(const std::vector< int > & validPoints,
 
 //change this
 inline void PlaneSegmenter::findLines(cv::Mat & src, LineArray & lines,
-                                      cv::Mat & dst, 
                                       pcl::visualization::ImageViewer * viewer )
 {
     
