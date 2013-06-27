@@ -28,6 +28,7 @@ class SimpleOpenNIViewer
     //this holds a set of colors for visualization
     std::vector< cv::Vec3i > colors;
 
+<<<<<<< HEAD
     //
     pcl::visualization::PCLVisualizer * line_viewer;
     //pcl::visualization::CloudViewer * cloud_viewer;
@@ -41,6 +42,11 @@ class SimpleOpenNIViewer
     bool showImage;
 
     float fx, fy, u0, v0;
+=======
+    PointCloud::Ptr inlierCloud;
+    Display * viewer;
+    ImageDisplay * imageViewer;
+>>>>>>> parent of e59f50f... added functionality to save/read pcd files
 
     PlaneSegmenter segmenter;
 
@@ -55,9 +61,13 @@ class SimpleOpenNIViewer
         //cloud_viewer = new pcl::visualization::CloudViewer( "Cloud Viewer" );
         image_viewer = new pcl::visualization::ImageViewer( "Image Viewer" );
 
+<<<<<<< HEAD
         filename = "pcd_frames/sample";
 
 
+=======
+    SimpleOpenNIViewer (){
+>>>>>>> parent of e59f50f... added functionality to save/read pcd files
         colors.push_back( cv::Vec3i ( 255,   0,   0 ));
         colors.push_back( cv::Vec3i ( 0  , 255,   0 ));
         colors.push_back( cv::Vec3i (   0,   0, 255 ));
@@ -68,6 +78,35 @@ class SimpleOpenNIViewer
         colors.push_back( cv::Vec3i ( 125, 255, 125 ));
         colors.push_back( cv::Vec3i ( 125, 125, 255 ));
 
+<<<<<<< HEAD
+=======
+        pixel_size = 1.075;
+        
+        //these are initialized to invalid starting points for the 
+        //purposes of error checking
+        u0 = -1;
+        v0 = -1; 
+
+        PointCloud::Ptr temp(new PointCloud );
+        inlierCloud = temp;
+
+        viewer = new Display;
+        imageViewer = new ImageDisplay;
+        imageViewer->setPosition( 700, 10 );
+        imageViewer->setSize( 640, 480 );
+
+        //viewer->setBackgroundColor (0,0,0);
+        ColorHandler rgb(inlierCloud);
+        //pcl::visualization::PointCloudColorHandlerCustom<Point>
+            //inlierColor( inlierCloud, 255, 255, 0 );
+
+        viewer->addPointCloud<Point> (inlierCloud, rgb,  "cloud");
+        viewer->setPointCloudRenderingProperties 
+           (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "cloud");
+        viewer->addCoordinateSystem (0.5);
+        viewer->initCameraParameters();
+        viewer->setCameraPosition(0,0,-1.3, 0,-1,0);
+>>>>>>> parent of e59f50f... added functionality to save/read pcd files
     }
 
     //create a viewer that holds lines and a point cloud.
@@ -104,6 +143,7 @@ class SimpleOpenNIViewer
         u0 = cloud->width / 2;
         v0 = cloud->height / 2;
         
+<<<<<<< HEAD
         segmenter.setCameraIntrinsics( deviceFocalLength, deviceFocalLength,
                                        u0, v0 );
         ColorHandler rgb( cloud );   
@@ -137,6 +177,20 @@ class SimpleOpenNIViewer
             segmenter.segment( cloud, planes );
             updateViewer( cloud, planes );
         }
+=======
+    void cloud_cb_ (const PointCloud::ConstPtr &cloud)
+    {
+      if ( !viewer->wasStopped() ){
+        if ( u0 == -1 || v0 == -1 ){
+            u0 = cloud->width / 2;
+            v0 = cloud->height / 2;
+        }
+        std::vector< LinePosArray > linePositions;
+        segment( cloud, linePositions, 50000 );
+        updateViewer( cloud, linePositions );
+        viewer->spinOnce (100);
+      }
+>>>>>>> parent of e59f50f... added functionality to save/read pcd files
 
       cout << "ended Call back\n";
     }
@@ -157,6 +211,7 @@ class SimpleOpenNIViewer
                 }
 
 
+<<<<<<< HEAD
 
                 segmenter.segment( cloud, planes );
                 updateViewer( cloud, planes );
@@ -165,6 +220,8 @@ class SimpleOpenNIViewer
 
     }
 
+=======
+>>>>>>> parent of e59f50f... added functionality to save/read pcd files
     void run ()
     {
 
@@ -191,6 +248,7 @@ class SimpleOpenNIViewer
 #endif
     }
 
+<<<<<<< HEAD
 
     void savePointCloud(const PointCloud & cloud)
     {
@@ -220,6 +278,155 @@ class SimpleOpenNIViewer
     inline void convertColor( PointCloud::Ptr & cloud,
                        cv::Mat & mat,
                        pcl::PointIndices::Ptr inliers)
+=======
+  private:
+
+    
+    void segment(const PointCloud::ConstPtr &cloud, 
+                 std::vector< LinePosArray > & linePositions, 
+                 int size)
+    {   
+
+        pcl::ModelCoefficients::Ptr coefficients
+                                             (new pcl::ModelCoefficients);
+
+        // Create the segmentation object
+        pcl::SACSegmentation<Point> seg;
+        // Optional
+        seg.setOptimizeCoefficients (false);
+        // Mandatory
+        seg.setModelType (pcl::SACMODEL_PLANE);
+        seg.setMethodType (pcl::SAC_RANSAC);
+        seg.setDistanceThreshold (0.03);
+
+        seg.setInputCloud ( cloud->makeShared() );
+
+        pcl::ExtractIndices< Point > extractor;
+        extractor.setInputCloud( cloud );
+
+        pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
+        pcl::PointIndices::Ptr outliers (new pcl::PointIndices);
+        outliers = seg.getIndices();
+        cout << "Starting Length of outliers is " 
+             << outliers->indices.size() << "\n" ;
+
+        while( inlierCloud->width > size){
+            pcl::PointIndices::Ptr remaining( new PointCloud );
+            filterOutIndices( outliers, inliers, remaining );
+
+            outliers = extractor.getRemovedIndices();
+            seg.setIndices( outliers );
+            seg.segment (*inliers, *coefficients);
+
+            //copy plane 
+            if (inliers->indices.size () == 0)
+            {
+              PCL_ERROR("Could not estimate a plane for the given data.");
+                cout << "Invalid cloud data" << endl;
+                return;
+            }
+            
+            pcl::copyPointCloud<Point>(*cloud, 
+                                        inliers->indices,
+                                        *inlierCloud);
+
+
+            cv::Mat majorPlane = cv::Mat::zeros(cloud->height *
+                                                cloud->width,
+                                                1 , CV_8UC1 );
+            cloudToMat(inliers, majorPlane );
+      
+            majorPlane.rows = cloud->height;
+            majorPlane.cols = cloud->width;
+
+            //std::cout << "majorPlane is " << majorPlane.cols <<
+            //             "x" << majorPlane.rows << "\n";
+
+            cv::Mat cannyLineMat;
+            LineArray lines;
+            findLines( majorPlane, lines, cannyLineMat );
+            convertColor(cannyLineMat, inliers);  
+            
+            LinePosArray currentLinePos;
+            linesToPositions(coefficients, lines, currentLinePos );
+
+            linePositions.push_back( currentLinePos );
+
+            outliers = remaining;
+        }
+    }
+
+
+    void filterOutIndices( const pcl::PointIndices::ConstPtr & larger,
+                           const pcl::PointIndices::ConstPtr & remove,
+                           pcl::PointIndices::Ptr & final ){
+        int j = 0;
+        for( int i = 0; i < larger->indices.size() ; i ++ ){
+            if ( larger->indices[i] == remove->indices[j] ){
+                j++;
+            }
+            else{
+                final->indices.push_back( larger->indices[i] );
+            }
+        }
+    }
+
+
+    void cloudToMat(const pcl::PointIndices::Ptr & validPoints,
+                          cv::Mat &mat)
+    {
+      //set the values of mat that correspond to being on the major
+      // plane of interest.
+      //These values should be 1, we will end up with a binary matrix:
+      //a value of 1 is on the plane,
+      //a value of 0 is off the plane.
+      for (int i=0; i < validPoints->indices.size(); i++){
+	    int index = validPoints->indices[i];
+        mat.at<uint8_t>( index, 1 ) = 255;
+	  }
+      
+    }
+    
+    void findLines(cv::Mat & src, LineArray & lines, cv::Mat & dst)
+    {
+        
+        try{
+            //cv::blur( src, dst, cv::Size(5,5) );
+            src.copyTo(dst);
+            cv::Canny(dst, dst, 25, 230, 3);
+        }
+        catch ( exception & e ){
+            cout << "Error with canny edge detector" << e.what() << "\n";
+            return;
+        }
+        
+        int size = 4 ;
+        cv::Mat kernel = cv::Mat::ones( size, size, CV_64F ); 
+        cv::dilate( dst, dst, kernel);
+
+        //dst, lines, rho_resolution, theta_resolution, threshold,
+        //minLinLength, maxLineGap
+        cv::HoughLinesP(dst, lines, 8, CV_PI/180, 200, 100, 4 );
+        
+        cv::Mat cdst;
+        cv::cvtColor(src, cdst, CV_GRAY2BGR);
+
+        for( size_t i = 0; i < lines.size(); i++ )
+        {
+            cv::Vec4i l = lines[i];
+            cv::line( cdst, cv::Point(l[0], l[1]),
+                            cv::Point(l[2], l[3]),
+                            cv::Scalar(0,0,255),
+                            3, CV_AA);
+        }
+        
+        imageViewer->showRGBImage( cdst.data, cdst.cols, cdst.rows );
+        //cv::imshow("foo", cdst);
+        //cv::waitKey(30);
+                
+    }
+    void convertColor(cv::Mat & mat, pcl::PointIndices::Ptr inliers)
+>>>>>>> parent of e59f50f... added functionality to save/read pcd files
     {
         cv::Mat newMat = mat.reshape( 1, mat.cols * mat.rows );
         
