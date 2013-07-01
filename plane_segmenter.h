@@ -54,8 +54,9 @@ private:
     int minPlaneSize; 
 
     //these variables control the parameters of the HoughLines function.
-    float HL_rhoRes, HL_thetaRes;
-    int HL_threshold, HL_minLineLength, HL_maxLineGap ;
+    float binary_rhoRes, binary_thetaRes, intensity_rhoRes, intensity_thetaRes;
+    int binary_threshold, binary_minLineLength, binary_maxLineGap ;
+    int intensity_threshold, intensity_minLineLength, intensity_maxLineGap ;
 
     //these are the intrinsics of the camera
     float fx, fy, u0, v0;
@@ -78,16 +79,16 @@ private:
     inline void cloudToMatBinary(const std::vector< int > & validPoints,
                            cv::Mat &mat                            );
 
-    inline void PlaneSegmenter::cloudToMatIntensity(
+    inline void cloudToMatIntensity(
                                         const std::vector< int > & validPoints,
                                         cv::Mat &mat,
                                         const PointCloud::ConstPtr & cloud);
 
-    inline uint8_t PlaneSegmenter::rgbToIntensity( uint32_t rgb );
+    inline uint8_t rgbToIntensity( uint32_t rgb );
 
     //This takes an image (preferably a binary image) and performs the canny
     //edge detection algorithm. Then a houghLine algorithm is run to extract lines
-    inline void findLines(const PointIndices::Ptr & inliers,
+    inline void findLines(const pcl::PointIndices::Ptr & inliers,
                           const PointCloud::ConstPtr & cloud,
                           LineArray & planarLines,
                           LineArray & intensityLines,
