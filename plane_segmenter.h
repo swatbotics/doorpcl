@@ -17,6 +17,7 @@
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/core/core.hpp"
 
+#include "SimpleConfig.h"
 
 class PlaneSegmenter{
 
@@ -27,7 +28,7 @@ public:
     typedef std::vector< cv::Vec4i > LineArray;
     typedef std::vector< pcl::PointXYZ > LinePosArray;
 
-
+    PlaneSegmenter( const std::string & configFileName );
     PlaneSegmenter(int maxNumPlanes=6, int minSize=50000,
                    bool optimize=false, float threshold=0.03 );
 
@@ -53,21 +54,40 @@ public:
     void setFilterParams(int blur, int cannyIntensity, int filterSize,
                          int cannyDepth, int dilationSize, int lineInc);
 
+    void setCannyParams( int binarySize, int binaryLowerThreshold,
+                         int binaryUpperThreshold,
+                         int intensitySize, int intensityLowerThreshold,
+                         int intensityUpperThreshold );
+
 private:
 
     int maxPlaneNumber;
     int minPlaneSize; 
 
-    int blurSize, cannyIntensitySize, filterSize, cannyDepthSize,
-        intensityDilationSize, lineIncrease;
+    //these are the parameters for the filters which are applied to images.
+    int blurSize;              //this controls the size of the blurring kernel
+                               //used to blur the intensity image;
+    int filterSize;            //this is the size of the kernel used in the
+                               //morphological closing operation on the binary
+                               //image.
+    int intensityDilationSize; //this is the size of the dilation on the intensity
+                               //image.
+    int lineIncrease;      //This controls the amout by which the mask image
+                               //is dilated to remove the edges of the plane
+                               //from the canny edge detection consideration.
 
+    //these control the parameters for canny edge detection
+    int cannyIntensitySize, cannyBinarySize;
+    int cannyIntensityLowThreshold, cannyIntensityHighThreshold;
+    int cannyBinaryLowThreshold, cannyBinaryHighThreshold;
 
     //these variables control the parameters of the HoughLines function.
     float binary_rhoRes, binary_thetaRes, intensity_rhoRes, intensity_thetaRes;
     int binary_threshold, binary_minLineLength, binary_maxLineGap ;
     int intensity_threshold, intensity_minLineLength, intensity_maxLineGap ;
 
-    //these are the intrinsics of the camera
+    //these are the intrinsics of the camera, they must be set for the
+    //function to work. Not setting these values results in an assertion failure.
     float fx, fy, u0, v0;
 
     bool haveSetCamera;
