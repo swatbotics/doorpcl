@@ -25,6 +25,13 @@ PlaneSegmenter::PlaneSegmenter( int maxNumPlanes, int minSize,
     intensity_minLineLength = 60;
     intensity_maxLineGap = 20;
 
+    blurSize = 5;
+    cannyIntensitySize = 5;
+    filterSize = 5;
+    cannyDepthSize = 5;
+    intensityDilationSize = 10;
+    lineIncrease = 2;
+
     haveSetCamera = false;
 
 
@@ -62,6 +69,17 @@ void PlaneSegmenter::setHoughLinesBinary( float rho, float theta, int threshold,
     binary_maxLineGap = maxLineGap;
 }
 
+void PlaneSegmenter::setFilterParams ( int blur, int cannyIntensity,
+                                       int filterSize, int cannyDepth,
+                                       int dilationSize, int lineInc)
+{
+    this->blurSize = blur;
+    this->cannyIntensitySize = cannyIntensity;
+    this->filterSize = filterSize;
+    this->cannyDepthSize = cannyDepth;
+    this->intensityDilationSize = dilationSize;
+    this->lineIncrease = lineInc;
+}
 
 void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud, 
                              std::vector< LinePosArray > & linePositions,
@@ -167,23 +185,13 @@ inline void PlaneSegmenter::cloudToMatIntensity(const std::vector< int > & valid
     for (int i=0; i < validPoints.size(); i++){
         const int index = validPoints[i];
         const Point p = cloud->points[ index ];
-        const uint8_t intensity = rgbToIntensity( p.rgb );
+        const Eigen::Vector3i rgb( p.getRGBVector3i() );
+        const uint8_t intensity = ( rgb[0] + rgb[1] + rgb[2] ) / 3; 
         mat.at<uint8_t>( index, 1 ) = intensity;
     }
 
 }
 
-//this turns a pcl packed rgb struct into an intensity value.
-//this function is called during cloud to intensity matrix conversion.
-inline uint8_t PlaneSegmenter::rgbToIntensity( uint32_t rgb ){
-
-    uint8_t r = (rgb >> 16) & 0x0000ff;
-    uint8_t g = (rgb >> 8)  & 0x0000ff;
-    uint8_t b = (rgb)       & 0x0000ff;
-
-    return (r + b + g )/3;
-
-}
 
 //change this
 inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
@@ -193,32 +201,28 @@ inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
                                       pcl::visualization::ImageViewer * viewer )
 {
      
-    cv::Mat binary, intensity, mask;
-    int blurSize = 5;
-    int cannyIntensitySize = 5;
-    int filterSize = 5;
-    int cannyDepthSize = 5;
-    int intensityDilationSize = 10;
-    int lineIncrease = 2;
-
+    cv::Mat binary, intensity, mask, copyBinary, copyIntensity;
 
     //initialize the matrices
     //create a binary picture from the points in inliers.
-    binary    = cv::Mat::zeros(cloud->height * cloud->width, 1 , CV_8UC1 );
-    intensity = cv::Mat::zeros(cloud->height * cloud->width, 1 , CV_8UC1 );
+    copyBinary    = cv::Mat::zeros(cloud->height * cloud->width, 1 , CV_8UC1 );
+    copyIntensity = cv::Mat::zeros(cloud->height * cloud->width, 1 , CV_8UC1 );
 
-    cloudToMatBinary   (inliers->indices, binary );
-    cloudToMatIntensity(inliers->indices, intensity, cloud );
+    cloudToMatBinary   (inliers->indices, copyBinary );
+    cloudToMatIntensity(inliers->indices, copyIntensity, cloud );
 
     //reshape the matrix into the shape of the image and run the
     //canny edge detector on the resulting image.
-    binary.rows = cloud->height;
-    binary.cols = cloud->width;
+    copyBinary.rows = cloud->height;
+    copyBinary.cols = cloud->width;
 
-    intensity.rows = cloud->height;
-    intensity.cols = cloud->width;
+    copyIntensity.rows = cloud->height;
+    copyIntensity.cols = cloud->width;
 
-    binary.copyTo( mask );
+    copyBinary.copyTo( mask );
+    copyBinary.copyTo(binary);
+    copyIntensity.copyTo( intensity );
+    
 
     bool getIntensity = true;
     try{
@@ -235,8 +239,8 @@ inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
                                                      intensityDilationSize,
                                                                      CV_8U ); 
             //apply the mask.
-            cv::dilate( mask, mask, intensityKernel);
-            intensity.copyTo( intensity, mask );
+            //cv::dilate( mask, mask, intensityKernel);
+            //intensity.copyTo( intensity, mask );
             
         }
 
@@ -268,9 +272,10 @@ inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
     //dst, lines, rho_resolution, theta_resolution, threshold,
     //minLinLength, maxLineGap
     cv::HoughLinesP(binary, planarLines, binary_rhoRes, binary_thetaRes,
-                    binary_threshold, binary_minLineLength, binary_maxLineGap);
-    cv::HoughLinesP(intensity, intensityLines, intensity_rhoRes, intensity_thetaRes,
-                    intensity_threshold,intensity_minLineLength, intensity_maxLineGap);
+              binary_threshold, binary_minLineLength, binary_maxLineGap);
+    cv::HoughLinesP(intensity, intensityLines, intensity_rhoRes,
+                    intensity_thetaRes, intensity_threshold,
+                    intensity_minLineLength, intensity_maxLineGap);
 
     //draw the lines;
     if ( viewer != NULL ){     

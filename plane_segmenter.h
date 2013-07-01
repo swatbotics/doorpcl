@@ -48,10 +48,19 @@ public:
     void setCameraIntrinsics( float focus_x, float focus_y,
                               float origin_x, float origin_y );
 
+    //sets parameters for several openCV filters that are used inside
+    //the findLines function
+    void setFilterParams(int blur, int cannyIntensity, int filterSize,
+                         int cannyDepth, int dilationSize, int lineInc);
+
 private:
 
     int maxPlaneNumber;
     int minPlaneSize; 
+
+    int blurSize, cannyIntensitySize, filterSize, cannyDepthSize,
+        intensityDilationSize, lineIncrease;
+
 
     //these variables control the parameters of the HoughLines function.
     float binary_rhoRes, binary_thetaRes, intensity_rhoRes, intensity_thetaRes;
@@ -84,7 +93,6 @@ private:
                                         cv::Mat &mat,
                                         const PointCloud::ConstPtr & cloud);
 
-    inline uint8_t rgbToIntensity( uint32_t rgb );
 
     //This takes an image (preferably a binary image) and performs the canny
     //edge detection algorithm. Then a houghLine algorithm is run to extract lines

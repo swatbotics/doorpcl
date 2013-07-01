@@ -68,14 +68,25 @@ class SimpleOpenNIViewer
         float i_rhoRes, i_thetaRes;
         int i_threshold, i_minLineLength, i_maxLineGap;
 
+        int blurSize, cannyIntensitySize, filterSize, cannyDepthSize,
+            intensityDilationSize, lineIncrease;
+
         //get segmenter parameters from config file
         config.get("maxNumPlanes", maxNumPlanes);
         config.get("minSize", minSize);
         optimize = config.getBool("optimize");
         config.get("planeThreshold", planeThreshold);
 
+        //get filter parameters from config file
+        config.get("blurSize", blurSize);
+        config.get("cannyIntensitySize", cannyIntensitySize);
+        config.get("filterSize", filterSize);
+        config.get("cannyDepthSize", cannyDepthSize);
+        config.get("intensityDilationSize", intensityDilationSize);
+        config.get("lineIncrease",lineIncrease);
+
         //get Hough parameters from config file 
-        config.get("binary_intensity_rhoRes", b_rhoRes);
+        config.get("binary_rhoRes", b_rhoRes);
         config.get("binary_thetaRes", b_thetaRes);
         config.get("binary_threshold", b_threshold);
         config.get("binary_minLineLength", b_minLineLength);
@@ -87,6 +98,7 @@ class SimpleOpenNIViewer
         config.get("intensity_threshold", i_threshold);
         config.get("intensity_minLineLength", i_minLineLength);
         config.get("intensity_maxLineGap", i_maxLineGap);
+
 
 
         view1 = 0;
@@ -105,6 +117,9 @@ class SimpleOpenNIViewer
         segmenter.setHoughLinesIntensity( i_rhoRes, i_thetaRes, i_threshold,
                                           i_minLineLength, i_maxLineGap );
 
+        segmenter.setFilterParams(blurSize, cannyIntensitySize,
+                                  filterSize, cannyDepthSize,
+                                  intensityDilationSize, lineIncrease);
 
         colors.push_back( cv::Vec3i ( 255,   0,   0 ));
         colors.push_back( cv::Vec3i ( 0  , 255,   0 ));
@@ -212,7 +227,7 @@ class SimpleOpenNIViewer
                 }
 
 
-                segmenter.segment( cloud, planes );
+                segmenter.segment( cloud, planes, image_viewer );
                 updateViewer( cloud, planes );
             }
         }

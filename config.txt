@@ -6,13 +6,22 @@ minSize = 50000
 optimize = false
 planeThreshold = 0.06
 
-#Houghlines parameters
+#filter parameters
+blurSize = 40
+cannyIntensitySize = 3
+filterSize = 5
+cannyDepthSize = 5
+intensityDilationSize = 10
+lineIncrease = 2
+
+#depth Houghlines parameters
 binary_rhoRes = 1
 binary_thetaRes = 0.0175
 binary_threshold = 60
 binary_minLineLength = 60
 binary_maxLineGap = 20
 
+#color Houghlines parameters
 intensity_rhoRes = 1
 intensity_thetaRes = 0.0175
 intensity_threshold = 60
