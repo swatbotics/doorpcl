@@ -1,2 +1,0 @@
-/usr/bin/ar cr libplane_segmenter.a  CMakeFiles/plane_segmenter.dir/plane_segmenter.cpp.o
-/usr/bin/ranlib libplane_segmenter.a

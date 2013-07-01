@@ -12,6 +12,8 @@
 #include <boost/thread/thread.hpp>
 #include "plane_segmenter.h"
 
+#include "~/code/e91/e91/hubomz/mzcommon/SimpleConfig.h"
+
 class SimpleOpenNIViewer
 {
   public:
@@ -28,7 +30,7 @@ class SimpleOpenNIViewer
     //this holds a set of colors for visualization
     std::vector< cv::Vec3i > colors;
 
-    //
+    int view1, view2;
     pcl::visualization::PCLVisualizer * line_viewer;
     //pcl::visualization::CloudViewer * cloud_viewer;
     pcl::visualization::ImageViewer * image_viewer;
@@ -50,12 +52,17 @@ class SimpleOpenNIViewer
                             doWrite( false ), showImage( false ),
                             u0( -1), v0(-1)
                             {
-
+        view1 = 0;
+        view2 = 0;
         line_viewer = new pcl::visualization::PCLVisualizer( "Line Viewer" ) ;
+        line_viewer->initCameraParameters();
+        
         //cloud_viewer = new pcl::visualization::CloudViewer( "Cloud Viewer" );
         image_viewer = new pcl::visualization::ImageViewer( "Image Viewer" );
 
         filename = "pcd_frames/sample";
+        segmenter = PlaneSegmenter( 5, 50000, true, 0.06 );
+        segmenter.setHoughLines( 1, 3.14286/720, 60, 80, 10 );
 
 
         colors.push_back( cv::Vec3i ( 255,   0,   0 ));
@@ -75,10 +82,9 @@ class SimpleOpenNIViewer
                        const std::vector< LinePosArray > & planes )
     {
 
-        //cloud_viewer->showCloud( cloud );
-        
-        line_viewer->removeAllShapes();
+        line_viewer->removeAllShapes( view1);
         line_viewer->updatePointCloud( cloud, "cloud");
+
         cout << "Number of Planes: " << planes.size() << endl;
 
         for( int i = 0; i < planes.size(); i ++ ){
@@ -91,10 +97,13 @@ class SimpleOpenNIViewer
                 cv::Vec3i color = colors[ i % colors.size() ];
                 line_viewer->addLine(start, end,
                                 color[0], color[1], color[2],
-                                "line" +  boost::to_string( j*100 +i ) );
+                                "line" +  boost::to_string( j*100 +i ) , view1 );
             }
 
         }
+
+        //cloud_viewer->showCloud( cloud );
+        
 
         line_viewer->spinOnce (100);
         
@@ -106,15 +115,18 @@ class SimpleOpenNIViewer
         
         segmenter.setCameraIntrinsics( deviceFocalLength, deviceFocalLength,
                                        u0, v0 );
-        ColorHandler rgb( cloud );   
-
-        line_viewer->addPointCloud<Point> ( cloud, rgb,  "cloud");
+        ColorHandler rgb( cloud );  
+         
+        line_viewer->createViewPort( 0.0 , 0.0, 0.5, 1.0, view1 );
+        line_viewer->createViewPort( 0.5 , 0.0, 1.0, 1.0, view2 );
+         
+        line_viewer->addPointCloud<Point> ( cloud, rgb,  "cloud", view2);
         line_viewer->setPointCloudRenderingProperties 
-           (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "cloud");
-
-        line_viewer->addCoordinateSystem (0.5);
-        line_viewer->initCameraParameters();
-        line_viewer->setCameraPosition(0,0,-1.3, 0,-1,0);
+           (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "cloud", view2);
+        line_viewer->setBackgroundColor( 0, 0, 0, view2 );
+        line_viewer->setBackgroundColor( 0.1, 0.1, 0.1 , view1 );
+        line_viewer->addCoordinateSystem (0.1);
+        line_viewer->setCameraPosition(0,0,-3.5, 0,-1, 0);
 
         image_viewer->setPosition( 700, 10 );
         image_viewer->setSize( 640, 480 );
@@ -128,6 +140,8 @@ class SimpleOpenNIViewer
         if ( !viewerIsInitialized ){
             initViewer( cloud );
         }
+
+        if ( !line_viewer->wasStopped() ){
             if ( doWrite ){
                 savePointCloud( *cloud );
             }
@@ -136,7 +150,6 @@ class SimpleOpenNIViewer
             segmenter.segment( cloud, planes, image_viewer );
             updateViewer( cloud, planes );
 
-        if ( !line_viewer->wasStopped() ){
         }
 
       cout << "ended Call back\n";

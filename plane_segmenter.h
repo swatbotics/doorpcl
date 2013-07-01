@@ -84,6 +84,11 @@ private:
     inline void linesToPositions( const pcl::ModelCoefficients::Ptr & coeffs,
                                   const LineArray & lines, 
                                   LinePosArray & linePositions               );
+
+    inline void matrixLinesToPositions( const pcl::ModelCoefficients::Ptr & coeffs,
+                                       const LineArray & lines, 
+                                       LinePosArray & linePositions               );
+
 };
 
 #endif 

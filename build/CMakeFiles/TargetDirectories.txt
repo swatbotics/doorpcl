@@ -1,2 +1,0 @@
-/home/william/code/doorpcl/build/CMakeFiles/edge_detector.dir
-/home/william/code/doorpcl/build/CMakeFiles/plane_segmenter.dir

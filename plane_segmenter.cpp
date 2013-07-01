@@ -14,10 +14,10 @@ PlaneSegmenter::PlaneSegmenter( int maxNumPlanes, int minSize,
     seg.setDistanceThreshold ( threshold );
 
     HL_rhoRes = 1;
-    HL_thetaRes = CV_PI/360;
-    HL_threshold = 40;
-    HL_minLineLength = 45;
-    HL_maxLineGap = 25;
+    HL_thetaRes = CV_PI/180;
+    HL_threshold = 60;
+    HL_minLineLength = 60;
+    HL_maxLineGap = 20;
 
     haveSetCamera = false;
 
@@ -104,7 +104,7 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
         
         //transforms the lines in the plane into lines in space.
         linePositions.resize( linePositions.size() + 1 );
-        linesToPositions(coefficients, lines, linePositions.back() );
+        matrixLinesToPositions(coefficients, lines, linePositions.back() );
 
         filterOutIndices( *outliers, inliers->indices );
 
@@ -158,25 +158,27 @@ inline void PlaneSegmenter::findLines(cv::Mat & src, LineArray & lines,
         src.copyTo(dst);
 
         //this filter cleans up the noise from the sensor.
-        int size = 6 ;
-        cv::Mat kernel = cv::Mat::ones( size, size, CV_64F ); 
+        int size = 5;
+        //cv::blur( dst, dst, cv::Size(size , size) );
+        
+        cv::Mat kernel = cv::Mat::ones( size, size, CV_8U ); 
         cv::dilate( dst, dst, kernel);
         cv::erode( dst, dst, kernel );
-
-        cv::Canny(dst, dst, 25, 230, 3);
+        cv::Canny(dst, dst, 150, 200, 5);
     }
     catch ( std::exception & e ){
         cout << "Error with canny edge detector" << e.what() << "\n";
         return;
     }
     
+    cv::Mat kern = cv::Mat::ones( 2, 2, CV_8U ); 
+    cv::dilate( dst, dst, kern);
 
     //dst, lines, rho_resolution, theta_resolution, threshold,
     //minLinLength, maxLineGap
     cv::HoughLinesP(dst, lines, HL_rhoRes, HL_thetaRes, HL_threshold,
                     HL_minLineLength, HL_maxLineGap);
     
-    cout << "Number of lines: " << lines.size() << endl;
     //draw the lines;
     if ( viewer != NULL ){     
         cv::Mat cdst;
@@ -218,12 +220,47 @@ inline void PlaneSegmenter::linesToPositions(
             const float delta_u = u0 - u;
             const float delta_v = v0 - v;
 
-            const float z = ( A*fy*delta_u + B*fy*delta_v - C ) / D;
-            const float x = - delta_u * z / fx;
-            const float y = - delta_v * z / fy;
+            const float z = -D / ( A*delta_u/fx + B*delta_v/fy + C );
+            const float x = delta_u * z / fx;
+            const float y = delta_v * z / fy;
 
             linePositions.push_back( pcl::PointXYZ( x, y, z ) );
         }
     }
 }
+
+void PlaneSegmenter::matrixLinesToPositions( const pcl::ModelCoefficients::Ptr & coeffs,
+                             const LineArray & lines, 
+                             LinePosArray & linePositions
+                            ){
+
+    //the b vector;
+    const cv::Matx31f b ( -coeffs->values[3] , 0.0, 0.0 );
+    cv::Matx33f A( 
+           coeffs->values[0], coeffs->values[1], coeffs->values[2],
+           fx               , 0.0              , 0.0,
+           0.0              , fy               , 0.0         );
+
+    for( int i = 0; i < lines.size(); i ++ ){
+        cv::Matx31f position [2];
+        
+        for ( int j = 0; j < 2; j ++ ){
+            int u, v;
+            u = lines[i][0 + j*2];
+            v = lines[i][1 + j*2];
+            A( 1, 2) = u0 - u;
+            A( 2, 2) = v0 - v;
+            position[j] = A.inv() * b;
+        }
+
+        linePositions.push_back( pcl::PointXYZ( position[0](0,0), 
+                                   position[0](1,0),
+                                   position[0](2,0) ) );
+        linePositions.push_back( pcl::PointXYZ( position[1](0,0), 
+                                   position[1](1,0),
+                                   position[1](2,0) ));
+
+    }
+}
+
 
