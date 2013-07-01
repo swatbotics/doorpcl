@@ -186,7 +186,7 @@ inline uint8_t PlaneSegmenter::rgbToIntensity( uint32_t rgb ){
 }
 
 //change this
-inline void PlaneSegmenter::findLines( const PointIndices::Ptr & inliers,
+inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
                                        const PointCloud::ConstPtr & cloud,
                                       LineArray & planarLines,
                                       LineArray & intensityLines,
@@ -199,6 +199,7 @@ inline void PlaneSegmenter::findLines( const PointIndices::Ptr & inliers,
     int filterSize = 5;
     int cannyDepthSize = 5;
     int intensityDilationSize = 10;
+    int lineIncrease = 2;
 
 
     //initialize the matrices
@@ -207,15 +208,15 @@ inline void PlaneSegmenter::findLines( const PointIndices::Ptr & inliers,
     intensity = cv::Mat::zeros(cloud->height * cloud->width, 1 , CV_8UC1 );
 
     cloudToMatBinary   (inliers->indices, binary );
-    cloudToMatIntensity(inliers->indices, intensity );
+    cloudToMatIntensity(inliers->indices, intensity, cloud );
 
     //reshape the matrix into the shape of the image and run the
     //canny edge detector on the resulting image.
     binary.rows = cloud->height;
     binary.cols = cloud->width;
 
-    color.rows = cloud->height;
-    color.cols = cloud->width;
+    intensity.rows = cloud->height;
+    intensity.cols = cloud->width;
 
     binary.copyTo( mask );
 
@@ -235,7 +236,7 @@ inline void PlaneSegmenter::findLines( const PointIndices::Ptr & inliers,
                                                                      CV_8U ); 
             //apply the mask.
             cv::dilate( mask, mask, intensityKernel);
-            cvCopy( intensity, intensity, mask);
+            intensity.copyTo( intensity, mask );
             
         }
 
@@ -245,7 +246,7 @@ inline void PlaneSegmenter::findLines( const PointIndices::Ptr & inliers,
 
         //this filter cleans up the noise from the sensor.        
         //cv::blur( dst, dst, cv::Size(size , size) );
-        cv::Mat kernel = cv::Mat::ones( size, size, CV_8U ); 
+        cv::Mat kernel = cv::Mat::ones( filterSize, filterSize, CV_8U ); 
         cv::dilate( binary, binary, kernel);
         cv::erode( binary, binary, kernel );
         cv::Canny(binary, binary, 150, 200, cannyDepthSize);
@@ -261,8 +262,8 @@ inline void PlaneSegmenter::findLines( const PointIndices::Ptr & inliers,
     
 
 
-    cv::Mat kern = cv::Mat::ones( 2, 2, CV_8U ); 
-    cv::dilate( dst, dst, kern);
+    cv::Mat kern = cv::Mat::ones( lineIncrease, lineIncrease, CV_8U ); 
+    cv::dilate( binary, binary, kern);
 
     //dst, lines, rho_resolution, theta_resolution, threshold,
     //minLinLength, maxLineGap
@@ -274,11 +275,11 @@ inline void PlaneSegmenter::findLines( const PointIndices::Ptr & inliers,
     //draw the lines;
     if ( viewer != NULL ){     
         cv::Mat cdst;
-        cv::cvtColor(binary, cdst, CV_GRAY2BGR);
+        cv::cvtColor(intensity, cdst, CV_GRAY2BGR);
 
-        for( size_t i = 0; i < lines.size(); i++ )
+        for( size_t i = 0; i < intensityLines.size(); i++ )
         {
-            cv::Vec4i l = lines[i];
+            cv::Vec4i l = intensityLines[i];
             cv::line( cdst, cv::Point(l[0], l[1]),
                             cv::Point(l[2], l[3]),
                             cv::Scalar(0,0,255),
