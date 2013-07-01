@@ -51,8 +51,6 @@ class SimpleOpenNIViewer
     bool optimize;
     float planeThreshold;
      
-    float rhoRes, thetaRes;
-    int threshold, minLineLength, maxLineGap;
 
     SimpleConfig config;
 
@@ -64,6 +62,12 @@ class SimpleOpenNIViewer
                             u0( -1), v0(-1), config( configFile )
                             {
  
+        float b_rhoRes, b_thetaRes;
+        int b_threshold, b_minLineLength, b_maxLineGap;
+
+        float i_rhoRes, i_thetaRes;
+        int i_threshold, i_minLineLength, i_maxLineGap;
+
         //get segmenter parameters from config file
         config.get("maxNumPlanes", maxNumPlanes);
         config.get("minSize", minSize);
@@ -71,11 +75,19 @@ class SimpleOpenNIViewer
         config.get("planeThreshold", planeThreshold);
 
         //get Hough parameters from config file 
-        config.get("rhoRes", rhoRes);
-        config.get("thetaRes", thetaRes);
-        config.get("threshold", threshold);
-        config.get("minLineLength", minLineLength);
-        config.get("maxLineGap", maxLineGap);
+        config.get("binary_intensity_rhoRes", b_rhoRes);
+        config.get("binary_thetaRes", b_thetaRes);
+        config.get("binary_threshold", b_threshold);
+        config.get("binary_minLineLength", b_minLineLength);
+        config.get("binary_maxLineGap", b_maxLineGap);
+
+        //get Hough parameters from config file 
+        config.get("intensity_rhoRes", i_rhoRes);
+        config.get("intensity_thetaRes", i_thetaRes);
+        config.get("intensity_threshold", i_threshold);
+        config.get("intensity_minLineLength", i_minLineLength);
+        config.get("intensity_maxLineGap", i_maxLineGap);
+
 
         view1 = 0;
         view2 = 0;
@@ -88,10 +100,10 @@ class SimpleOpenNIViewer
         filename = "pcd_frames/sample";
         segmenter = PlaneSegmenter( maxNumPlanes, minSize, 
                                     optimize, planeThreshold );
-        segmenter.setHoughLinesBinary( rhoRes, thetaRes, threshold,
-                                       minLineLength, maxLineGap );
-        segmenter.setHoughLinesIntensity( rhoRes, thetaRes, threshold,
-                                          minLineLength, maxLineGap );
+        segmenter.setHoughLinesBinary( b_rhoRes, b_thetaRes, b_threshold,
+                                       b_minLineLength, b_maxLineGap );
+        segmenter.setHoughLinesIntensity( i_rhoRes, i_thetaRes, i_threshold,
+                                          i_minLineLength, i_maxLineGap );
 
 
         colors.push_back( cv::Vec3i ( 255,   0,   0 ));

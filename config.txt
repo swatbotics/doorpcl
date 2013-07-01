@@ -7,8 +7,14 @@ optimize = false
 planeThreshold = 0.06
 
 #Houghlines parameters
-rhoRes = 1
-thetaRes = 0.0175
-threshold = 60
-minLineLength = 60
-maxLineGap = 20
+binary_rhoRes = 1
+binary_thetaRes = 0.0175
+binary_threshold = 60
+binary_minLineLength = 60
+binary_maxLineGap = 20
+
+intensity_rhoRes = 1
+intensity_thetaRes = 0.0175
+intensity_threshold = 60
+intensity_minLineLength = 60
+intensity_maxLineGap = 20
