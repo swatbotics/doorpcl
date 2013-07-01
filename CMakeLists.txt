@@ -12,7 +12,7 @@ include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
-set(HDRS plane_segmenter.h )
+set(HDRS plane_segmenter.h  strutils.h SimpleConfig.h )
 set(SRCS plane_segmenter.cpp )
 
 add_library( plane_segmenter ${HDRS} ${SRCS} )
