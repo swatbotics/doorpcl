@@ -31,13 +31,20 @@ public:
     PlaneSegmenter(int maxNumPlanes=6, int minSize=50000,
                    bool optimize=false, float threshold=0.03 );
 
+    //call this to actually run the segmentation algorithm.
+    //if the user wants to display an image of the lines and planes in 2d, then
+    //the user can input a pointer to an image viewer.
     void segment(const PointCloud::ConstPtr &cloud, 
                  std::vector< LinePosArray > & linePositions,
                   pcl::visualization::ImageViewer * viewer=NULL  );
 
-    void setHoughLines( float rho, float theta, int threshold,
-                                    int minLineLength, int minLineGap);
+    //set the hough line parameters
+    void setHoughLinesBinary( float rho, float theta, int threshold,
+                                    int minLineLength, int maxLineGap);
+    void setHoughLinesIntensity( float rho, float theta, int threshold,
+                                    int minLineLength, int maxLineGap);
 
+    //set the camera intrinsics
     void setCameraIntrinsics( float focus_x, float focus_y,
                               float origin_x, float origin_y );
 
@@ -48,7 +55,7 @@ private:
 
     //these variables control the parameters of the HoughLines function.
     float HL_rhoRes, HL_thetaRes;
-    int HL_threshold, HL_minLineLength, HL_minLineGap ;
+    int HL_threshold, HL_minLineLength, HL_maxLineGap ;
 
     //these are the intrinsics of the camera
     float fx, fy, u0, v0;
@@ -68,11 +75,22 @@ private:
     //zeros.
     //This creates a binary image that can be easily used to threshold and
     //find lines or features.
-    inline void cloudToMat(const std::vector< int > & validPoints,
+    inline void cloudToMatBinary(const std::vector< int > & validPoints,
                            cv::Mat &mat                            );
+
+    inline void PlaneSegmenter::cloudToMatIntensity(
+                                        const std::vector< int > & validPoints,
+                                        cv::Mat &mat,
+                                        const PointCloud::ConstPtr & cloud);
+
+    inline uint8_t PlaneSegmenter::rgbToIntensity( uint32_t rgb );
+
     //This takes an image (preferably a binary image) and performs the canny
     //edge detection algorithm. Then a houghLine algorithm is run to extract lines
-    inline void findLines(cv::Mat & src, LineArray & lines,
+    inline void findLines(const PointIndices::Ptr & inliers,
+                          const PointCloud::ConstPtr & cloud,
+                          LineArray & planarLines,
+                          LineArray & intensityLines,
                           pcl::visualization::ImageViewer * viewer );
     
 
@@ -84,6 +102,11 @@ private:
     inline void linesToPositions( const pcl::ModelCoefficients::Ptr & coeffs,
                                   const LineArray & lines, 
                                   LinePosArray & linePositions               );
+
+    inline void matrixLinesToPositions( const pcl::ModelCoefficients::Ptr & coeffs,
+                                       const LineArray & lines, 
+                                       LinePosArray & linePositions               );
+
 };
 
 #endif 

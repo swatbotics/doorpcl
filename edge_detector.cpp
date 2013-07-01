@@ -12,6 +12,8 @@
 #include <boost/thread/thread.hpp>
 #include "plane_segmenter.h"
 
+#include "~/code/e91/e91/hubomz/mzcommon/SimpleConfig.h"
+
 class SimpleOpenNIViewer
 {
   public:
@@ -28,8 +30,7 @@ class SimpleOpenNIViewer
     //this holds a set of colors for visualization
     std::vector< cv::Vec3i > colors;
 
-<<<<<<< HEAD
-    //
+    int view1, view2;
     pcl::visualization::PCLVisualizer * line_viewer;
     //pcl::visualization::CloudViewer * cloud_viewer;
     pcl::visualization::ImageViewer * image_viewer;
@@ -42,11 +43,10 @@ class SimpleOpenNIViewer
     bool showImage;
 
     float fx, fy, u0, v0;
-=======
     PointCloud::Ptr inlierCloud;
+
     Display * viewer;
     ImageDisplay * imageViewer;
->>>>>>> parent of e59f50f... added functionality to save/read pcd files
 
     PlaneSegmenter segmenter;
 
@@ -56,18 +56,20 @@ class SimpleOpenNIViewer
                             doWrite( false ), showImage( false ),
                             u0( -1), v0(-1)
                             {
-
+        view1 = 0;
+        view2 = 0;
         line_viewer = new pcl::visualization::PCLVisualizer( "Line Viewer" ) ;
+        line_viewer->initCameraParameters();
+        
         //cloud_viewer = new pcl::visualization::CloudViewer( "Cloud Viewer" );
         image_viewer = new pcl::visualization::ImageViewer( "Image Viewer" );
 
-<<<<<<< HEAD
         filename = "pcd_frames/sample";
+        segmenter = PlaneSegmenter( 5, 50000, true, 0.06 );
+        segmenter.setHoughLines( 1, 3.14286/720, 60, 80, 10 );
 
 
-=======
     SimpleOpenNIViewer (){
->>>>>>> parent of e59f50f... added functionality to save/read pcd files
         colors.push_back( cv::Vec3i ( 255,   0,   0 ));
         colors.push_back( cv::Vec3i ( 0  , 255,   0 ));
         colors.push_back( cv::Vec3i (   0,   0, 255 ));
@@ -78,8 +80,6 @@ class SimpleOpenNIViewer
         colors.push_back( cv::Vec3i ( 125, 255, 125 ));
         colors.push_back( cv::Vec3i ( 125, 125, 255 ));
 
-<<<<<<< HEAD
-=======
         pixel_size = 1.075;
         
         //these are initialized to invalid starting points for the 
@@ -106,7 +106,6 @@ class SimpleOpenNIViewer
         viewer->addCoordinateSystem (0.5);
         viewer->initCameraParameters();
         viewer->setCameraPosition(0,0,-1.3, 0,-1,0);
->>>>>>> parent of e59f50f... added functionality to save/read pcd files
     }
 
     //create a viewer that holds lines and a point cloud.
@@ -114,11 +113,10 @@ class SimpleOpenNIViewer
                        const std::vector< LinePosArray > & planes )
     {
 
-        //cloud_viewer->showCloud( cloud );
-        
-        line_viewer->removeAllShapes();
-        viewer->updatePointCloud( cloud, "cloud");
-        //cout << "Number of Planes: " << planes.size() << endl;
+        line_viewer->removeAllShapes( view1);
+        line_viewer->updatePointCloud( cloud, "cloud");
+
+        cout << "Number of Planes: " << planes.size() << endl;
 
         for( int i = 0; i < planes.size(); i ++ ){
             const LinePosArray lines = planes[i];
@@ -130,10 +128,13 @@ class SimpleOpenNIViewer
                 cv::Vec3i color = colors[ i % colors.size() ];
                 line_viewer->addLine(start, end,
                                 color[0], color[1], color[2],
-                                "line" +  boost::to_string( j*100 +i ) );
+                                "line" +  boost::to_string( j*100 +i ) , view1 );
             }
 
         }
+
+        //cloud_viewer->showCloud( cloud );
+        
 
         line_viewer->spinOnce (100);
         
@@ -143,17 +144,20 @@ class SimpleOpenNIViewer
         u0 = cloud->width / 2;
         v0 = cloud->height / 2;
         
-<<<<<<< HEAD
         segmenter.setCameraIntrinsics( deviceFocalLength, deviceFocalLength,
                                        u0, v0 );
-        ColorHandler rgb( cloud );   
-
-        line_viewer->addPointCloud<Point> ( cloud, rgb,  "cloud");
+        ColorHandler rgb( cloud );  
+         
+        line_viewer->createViewPort( 0.0 , 0.0, 0.5, 1.0, view1 );
+        line_viewer->createViewPort( 0.5 , 0.0, 1.0, 1.0, view2 );
+         
+        line_viewer->addPointCloud<Point> ( cloud, rgb,  "cloud", view2);
         line_viewer->setPointCloudRenderingProperties 
-           (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "cloud");
-        line_viewer->addCoordinateSystem (0.5);
-        line_viewer->initCameraParameters();
-        line_viewer->setCameraPosition(0,0,-1.3, 0,-1,0);
+           (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "cloud", view2);
+        line_viewer->setBackgroundColor( 0, 0, 0, view2 );
+        line_viewer->setBackgroundColor( 0.1, 0.1, 0.1 , view1 );
+        line_viewer->addCoordinateSystem (0.1);
+        line_viewer->setCameraPosition(0,0,-3.5, 0,-1, 0);
 
         image_viewer->setPosition( 700, 10 );
         image_viewer->setSize( 640, 480 );
@@ -174,10 +178,10 @@ class SimpleOpenNIViewer
             }
 
             std::vector< LinePosArray > planes;
-            segmenter.segment( cloud, planes );
+            segmenter.segment( cloud, planes, image_viewer );
             updateViewer( cloud, planes );
+
         }
-=======
     void cloud_cb_ (const PointCloud::ConstPtr &cloud)
     {
       if ( !viewer->wasStopped() ){
@@ -190,7 +194,6 @@ class SimpleOpenNIViewer
         updateViewer( cloud, linePositions );
         viewer->spinOnce (100);
       }
->>>>>>> parent of e59f50f... added functionality to save/read pcd files
 
       cout << "ended Call back\n";
     }
@@ -211,7 +214,6 @@ class SimpleOpenNIViewer
                 }
 
 
-<<<<<<< HEAD
 
                 segmenter.segment( cloud, planes );
                 updateViewer( cloud, planes );
@@ -220,8 +222,6 @@ class SimpleOpenNIViewer
 
     }
 
-=======
->>>>>>> parent of e59f50f... added functionality to save/read pcd files
     void run ()
     {
 
@@ -248,7 +248,6 @@ class SimpleOpenNIViewer
 #endif
     }
 
-<<<<<<< HEAD
 
     void savePointCloud(const PointCloud & cloud)
     {
@@ -278,7 +277,6 @@ class SimpleOpenNIViewer
     inline void convertColor( PointCloud::Ptr & cloud,
                        cv::Mat & mat,
                        pcl::PointIndices::Ptr inliers)
-=======
   private:
 
     
