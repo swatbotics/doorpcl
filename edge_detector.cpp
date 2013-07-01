@@ -12,7 +12,7 @@
 #include <boost/thread/thread.hpp>
 #include "plane_segmenter.h"
 
-#include "~/code/e91/e91/hubomz/mzcommon/SimpleConfig.h"
+#include "SimpleConfig.h"
 
 class SimpleOpenNIViewer
 {
@@ -50,12 +50,37 @@ class SimpleOpenNIViewer
 
     PlaneSegmenter segmenter;
 
-    SimpleOpenNIViewer () : deviceFocalLength( 530.551),
+   
+    int maxNumPlanes, minSize;
+    bool optimize;
+    float planeThreshold;
+     
+    float rhoRes, thetaRes;
+    int threshold, minLineLength, maxLineGap;
+
+    SimpleConfig config;
+
+    SimpleOpenNIViewer ( const std::string & configFile )
+                          : deviceFocalLength( 530.551),
                             pixel_size( 1.075 ),
                             viewerIsInitialized( false ),
                             doWrite( false ), showImage( false ),
-                            u0( -1), v0(-1)
+                            u0( -1), v0(-1), config( configFile )
                             {
+ 
+        //get segmenter parameters from config file
+        config.get("maxNumPlanes", maxNumPlanes);
+        config.get("minSize", minSize);
+        optimize = config.getBool("optimize");
+        config.get("planeThreshold", planeThreshold);
+
+        //get Hough parameters from config file 
+        config.get("rhoRes", rhoRes);
+        config.get("thetaRes", thetaRes);
+        config.get("threshold", threshold);
+        config.get("minLineLength", minLineLength);
+        config.get("maxLineGap", maxLineGap);
+
         view1 = 0;
         view2 = 0;
         line_viewer = new pcl::visualization::PCLVisualizer( "Line Viewer" ) ;
@@ -65,8 +90,10 @@ class SimpleOpenNIViewer
         image_viewer = new pcl::visualization::ImageViewer( "Image Viewer" );
 
         filename = "pcd_frames/sample";
-        segmenter = PlaneSegmenter( 5, 50000, true, 0.06 );
-        segmenter.setHoughLines( 1, 3.14286/720, 60, 80, 10 );
+        segmenter = PlaneSegmenter( maxNumPlanes, minSize, 
+                                    optimize, planeThreshold );
+        segmenter.setHoughLines( rhoRes, thetaRes, threshold,
+                                 minLineLength, maxLineGap );
 
 
     SimpleOpenNIViewer (){
@@ -212,7 +239,6 @@ class SimpleOpenNIViewer
                 if ( !viewerIsInitialized ){
                     initViewer( cloud );
                 }
-
 
 
                 segmenter.segment( cloud, planes );
@@ -461,7 +487,7 @@ void printUsage(){
 int main (int argc, char * argv[])
 {
 
-  SimpleOpenNIViewer v;
+  SimpleOpenNIViewer v( "../config.txt" );
 
   //if there are no arguments, print the usage and run the file;
   if ( argc == 1 ){

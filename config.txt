@@ -1,0 +1,14 @@
+#this is our config file
+
+#plane segmenter parameters
+maxNumPlanes = 6
+minSize = 50000
+optimize = false
+planeThreshold = 0.06
+
+#Houghlines parameters
+rhoRes = 1
+thetaRes = 0.0175
+threshold = 60
+minLineLength = 60
+maxLineGap = 20
