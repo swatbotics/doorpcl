@@ -29,7 +29,7 @@ PlaneSegmenter::PlaneSegmenter( const std::string & configFileName ){
     //get the filter parameters.
     config.get( "blurSize", blurSize);
     config.get( "filterSize", filterSize);
-    config.get( "intensityDilationSize", intensityDilationSize);
+    config.get( "intensityErosionSize", intensityErosionSize);
     config.get( "lineDilationSize", lineDilationSize );
 
     double planeThreshold;
@@ -122,11 +122,11 @@ void PlaneSegmenter::setCannyParams( int binarySize, int binaryLowerThreshold,
 
 
 void PlaneSegmenter::setFilterParams ( int blur, int filterSize,
-                                       int intensityDilation, int lineDilation )
+                                       int intensityErosion, int lineDilation )
 {
     this->blurSize = blur;
     this->filterSize = filterSize;
-    this->intensityDilationSize = intensityDilation;
+    this->intensityErosionSize = intensityErosion;
     this->lineDilationSize = lineDilation;
 }
 
@@ -250,7 +250,8 @@ inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
                                       pcl::visualization::ImageViewer * viewer )
 {
      
-    cv::Mat binary, intensity, mask, copyBinary, copyIntensity;
+    cv::Mat binary, intensity, mask, copyBinary, copyIntensity, maskedIntensity;
+   
 
     //initialize the matrices
     //create a binary picture from the points in inliers.
@@ -271,7 +272,8 @@ inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
     copyBinary.copyTo( mask );
     copyBinary.copyTo(binary);
     copyIntensity.copyTo( intensity );
-    
+   
+
 
     bool getIntensity = true;
     try{
@@ -286,12 +288,12 @@ inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
             //remove the noise added by including the edges.
             //This will increase the size of the mask image so that 
             //it can get rid of the edges when copied over.
-            cv::Mat intensityKernel = cv::Mat::ones( intensityDilationSize,
-                                                     intensityDilationSize,
+            cv::Mat intensityKernel = cv::Mat::ones( intensityErosionSize,
+                                                     intensityErosionSize,
                                                                      CV_8U ); 
 
             cv::erode( mask, mask, intensityKernel);
-            intensity.copyTo( intensity, mask );
+            intensity.copyTo( maskedIntensity, mask );
             
         }
 
@@ -308,7 +310,6 @@ inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
                                   cannyBinaryHighThreshold,
                                   cannyBinarySize);
         
-        bool getIntensity = true;
 
 
     }
@@ -326,14 +327,14 @@ inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
     //minLinLength, maxLineGap
     cv::HoughLinesP(binary, planarLines, binary_rhoRes, binary_thetaRes,
               binary_threshold, binary_minLineLength, binary_maxLineGap);
-    cv::HoughLinesP(intensity, intensityLines, intensity_rhoRes,
+    cv::HoughLinesP(maskedIntensity, intensityLines, intensity_rhoRes,
                     intensity_thetaRes, intensity_threshold,
                     intensity_minLineLength, intensity_maxLineGap);
 
     //draw the lines;
     if ( viewer != NULL ){     
         cv::Mat cdst;
-        cv::cvtColor(intensity, cdst, CV_GRAY2BGR);
+        cv::cvtColor(maskedIntensity, cdst, CV_GRAY2BGR);
 
         for( size_t i = 0; i < intensityLines.size(); i++ )
         {

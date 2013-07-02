@@ -68,7 +68,7 @@ class SimpleOpenNIViewer
         float i_rhoRes, i_thetaRes;
         int i_threshold, i_minLineLength, i_maxLineGap;
 
-        int blurSize, filterSize, intensityDilationSize, lineDilationSize;
+        int blurSize, filterSize, intensityErosionSize, lineDilationSize;
 
             //these control the parameters for canny edge detection
         int cannyIntensitySize, cannyBinarySize;
@@ -84,7 +84,7 @@ class SimpleOpenNIViewer
         //get filter parameters from config file
         config.get("blurSize", blurSize);
         config.get("filterSize", filterSize);
-        config.get("intensityDilationSize", intensityDilationSize);
+        config.get("intensityErosionSize", intensityErosionSize);
         config.get("lineDilationSize", lineDilationSize);
 
         //get Hough parameters from config file 
@@ -118,8 +118,11 @@ class SimpleOpenNIViewer
         segmenter.setHoughLinesIntensity( i_rhoRes, i_thetaRes, i_threshold,
                                           i_minLineLength, i_maxLineGap );
         segmenter.setFilterParams(blurSize, filterSize,
-                                  intensityDilationSize, lineDilationSize);
-
+                                  intensityErosionSize, lineDilationSize);
+        segmenter.setCannyParams(cannyBinarySize, cannyBinaryLowThreshold,
+                                 cannyBinaryHighThreshold, cannyIntensitySize,
+                                 cannyIntensityLowThreshold,
+                                 cannyIntensityHighThreshold);
 
         view1 = 0;
         view2 = 0;
