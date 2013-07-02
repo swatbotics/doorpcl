@@ -35,7 +35,8 @@ PlaneSegmenter::PlaneSegmenter( const std::string & configFileName ){
     double planeThreshold;
     int minPlaneSize;
     bool optimize;
-
+    
+    //get plane segmentation parameters
     config.get("maxPlaneNumber", maxPlaneNumber);
     config.get("minPlaneSize", minPlaneSize);
     optimize = config.getBool("optimize");
@@ -50,17 +51,15 @@ PlaneSegmenter::PlaneSegmenter( const std::string & configFileName ){
 
 
     haveSetCamera = false;
-
 }
     
 
 
-
+//PlaneSegmenter constructor
 PlaneSegmenter::PlaneSegmenter( int maxNumPlanes, int minSize,
                                 bool optimize, float threshold ) : 
         maxPlaneNumber( maxNumPlanes ), minPlaneSize( minSize) 
 {
-    
     // Optional
     seg.setOptimizeCoefficients (optimize );
     // Mandatory
@@ -68,15 +67,12 @@ PlaneSegmenter::PlaneSegmenter( int maxNumPlanes, int minSize,
     seg.setMethodType (pcl::SAC_RANSAC);
     seg.setDistanceThreshold ( threshold );
 
-
     haveSetCamera = false;
-
-
 }
 
+//Sets focal length and initial points for vision algorithm
 void PlaneSegmenter::setCameraIntrinsics( float focus_x, float focus_y,
                                           float origin_x, float origin_y ){
-
     fx = focus_x;
     fy = focus_y;
     u0 = origin_x;
@@ -85,7 +81,7 @@ void PlaneSegmenter::setCameraIntrinsics( float focus_x, float focus_y,
     haveSetCamera = true;
 }
 
-
+//Sets parameters for rgb HoughLines algorithm
 void PlaneSegmenter::setHoughLinesIntensity( float rho, float theta, int threshold,
                                     int minLineLength, int maxLineGap){
 
@@ -96,6 +92,7 @@ void PlaneSegmenter::setHoughLinesIntensity( float rho, float theta, int thresho
     intensity_maxLineGap = maxLineGap;
 }
 
+//Sets parameters for binary HoughLines algorithm
 void PlaneSegmenter::setHoughLinesBinary( float rho, float theta, int threshold,
                                     int minLineLength, int maxLineGap){
 
@@ -106,6 +103,7 @@ void PlaneSegmenter::setHoughLinesBinary( float rho, float theta, int threshold,
     binary_maxLineGap = maxLineGap;
 }
 
+//Sets parameters for binary Canny algorithm
 void PlaneSegmenter::setCannyParams( int binarySize, int binaryLowerThreshold,
                      int binaryUpperThreshold,
                      int intensitySize, int intensityLowerThreshold,
@@ -117,10 +115,9 @@ void PlaneSegmenter::setCannyParams( int binarySize, int binaryLowerThreshold,
     cannyIntensityHighThreshold = intensityUpperThreshold;
     cannyBinaryLowThreshold = binaryLowerThreshold;
     cannyBinaryHighThreshold = binaryUpperThreshold;
-
 }
 
-
+//Sets parameters for noise filter
 void PlaneSegmenter::setFilterParams ( int blur, int filterSize,
                                        int intensityErosion, int lineDilation )
 {
@@ -130,6 +127,7 @@ void PlaneSegmenter::setFilterParams ( int blur, int filterSize,
     this->lineDilationSize = lineDilation;
 }
 
+//Planar segmentation function
 void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud, 
                              std::vector< LinePosArray > & linePositions,
                              pcl::visualization::ImageViewer * viewer ) 
@@ -188,7 +186,7 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
            inliers->indices.size() > minPlaneSize   );
 }
 
-
+//Removes segmented planes from the point cloud
 inline void PlaneSegmenter::filterOutIndices( std::vector< int > & larger,
                        const std::vector<int> & remove){
     int j = 0;
@@ -207,7 +205,7 @@ inline void PlaneSegmenter::filterOutIndices( std::vector< int > & larger,
     larger.resize( k );
 }
 
-
+//Transforms point cloud to a binary matrix
 inline void PlaneSegmenter::cloudToMatBinary(const std::vector< int > & validPoints,
                        cv::Mat &mat)
 {
@@ -222,14 +220,16 @@ inline void PlaneSegmenter::cloudToMatBinary(const std::vector< int > & validPoi
   
 }
 
-inline void PlaneSegmenter::cloudToMatIntensity(const std::vector< int > & validPoints,
+//Transforms point cloud to an intensity matrix
+inline void PlaneSegmenter::cloudToMatIntensity(const std::vector< int > & 
+                                                validPoints,
                                                 cv::Mat &mat,
                                                 const PointCloud::ConstPtr & cloud)
 {
     //set the values of mat that correspond to being on the major
     // plane of interest.
-    //These values should be 1, we will end up with a binary matrix:
-    //a value of 1 is on the plane,
+    //A non-zero value is on the plane and the value corresponds to the average of
+    //its rgb values, aka the intensity
     //a value of 0 is off the plane.
     for (int i=0; i < validPoints.size(); i++){
         const int index = validPoints[i];
@@ -238,11 +238,9 @@ inline void PlaneSegmenter::cloudToMatIntensity(const std::vector< int > & valid
         const uint8_t intensity = ( rgb[0] + rgb[1] + rgb[2] ) / 3; 
         mat.at<uint8_t>( index, 1 ) = intensity;
     }
-
 }
 
-
-//change this
+//Find depth and color lines from segmented plane
 inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
                                        const PointCloud::ConstPtr & cloud,
                                       LineArray & planarLines,
@@ -323,8 +321,7 @@ inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
     cv::Mat kern = cv::Mat::ones( lineDilationSize, lineDilationSize, CV_8U ); 
     cv::dilate( binary, binary, kern);
 
-    //dst, lines, rho_resolution, theta_resolution, threshold,
-    //minLinLength, maxLineGap
+    //run HoughLines on noise-filtered color and depth matrices
     cv::HoughLinesP(binary, planarLines, binary_rhoRes, binary_thetaRes,
               binary_threshold, binary_minLineLength, binary_maxLineGap);
     cv::HoughLinesP(maskedIntensity, intensityLines, intensity_rhoRes,
@@ -381,7 +378,9 @@ inline void PlaneSegmenter::linesToPositions(
     }
 }
 
-void PlaneSegmenter::matrixLinesToPositions( const pcl::ModelCoefficients::Ptr & coeffs,
+//Transforms 2D lines returned by HoughLines into lines we can draw in viewer
+void PlaneSegmenter::matrixLinesToPositions( const pcl::ModelCoefficients::Ptr 
+                             & coeffs,
                              const LineArray & lines, 
                              LinePosArray & linePositions
                             ){

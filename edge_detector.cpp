@@ -45,12 +45,10 @@ class SimpleOpenNIViewer
     float fx, fy, u0, v0;
 
     PlaneSegmenter segmenter;
-
    
     int maxNumPlanes, minSize;
     bool optimize;
     float planeThreshold;
-     
 
     SimpleConfig config;
 
@@ -70,7 +68,7 @@ class SimpleOpenNIViewer
 
         int blurSize, filterSize, intensityErosionSize, lineDilationSize;
 
-            //these control the parameters for canny edge detection
+        //these control the parameters for canny edge detection
         int cannyIntensitySize, cannyBinarySize;
         int cannyIntensityLowThreshold, cannyIntensityHighThreshold;
         int cannyBinaryLowThreshold, cannyBinaryHighThreshold;
@@ -101,7 +99,7 @@ class SimpleOpenNIViewer
         config.get("intensity_minLineLength", i_minLineLength);
         config.get("intensity_maxLineGap", i_maxLineGap);
 
-        //get the canny stuff.
+        //get the canny parameters from config file
         config.get( "cannyIntensitySize", cannyIntensitySize);
         config.get( "cannyBinarySize", cannyBinarySize );
         config.get( "cannyIntensityLowThreshold", cannyIntensityLowThreshold);
@@ -110,7 +108,7 @@ class SimpleOpenNIViewer
         config.get( "cannyBinaryHighThreshold", cannyBinaryHighThreshold);
 
 
-        //set the parameters for the segmenter.
+        //set the parameters for the segmenter
         segmenter = PlaneSegmenter( maxNumPlanes, minSize, 
                                     optimize, planeThreshold );
         segmenter.setHoughLinesBinary( b_rhoRes, b_thetaRes, b_threshold,
@@ -134,7 +132,7 @@ class SimpleOpenNIViewer
 
         filename = "pcd_frames/sample";
 
-
+        //array of colors we will use to draw edge lines
         colors.push_back( cv::Vec3i ( 255,   0,   0 ));
         colors.push_back( cv::Vec3i ( 0  , 255,   0 ));
         colors.push_back( cv::Vec3i (   0,   0, 255 ));
@@ -179,6 +177,7 @@ class SimpleOpenNIViewer
         
     }
     
+    //initialize point cloud viewer
     void initViewer( const PointCloud::ConstPtr & cloud ){
         u0 = cloud->width / 2;
         v0 = cloud->height / 2;
@@ -205,6 +204,8 @@ class SimpleOpenNIViewer
 
     }
     
+    //point cloud callback function gets new pointcloud and runs segmentation
+    //algorithm
     void cloud_cb_ (const PointCloud::ConstPtr &cloud)
     {
         if ( !viewerIsInitialized ){
@@ -219,7 +220,6 @@ class SimpleOpenNIViewer
             std::vector< LinePosArray > planes;
             segmenter.segment( cloud, planes, image_viewer );
             updateViewer( cloud, planes );
-
         }
 
       cout << "ended Call back\n";
@@ -274,7 +274,7 @@ class SimpleOpenNIViewer
 #endif
     }
 
-
+    //aves pcd files from grabbed pointclouds
     void savePointCloud(const PointCloud & cloud)
     {
         static int index = 0;
@@ -284,7 +284,7 @@ class SimpleOpenNIViewer
         index ++;
     }
 
-    
+    //reads existing pcd files
     void readPointCloud(PointCloud::Ptr & cloud)
     {
         static int index = 0;
@@ -298,7 +298,6 @@ class SimpleOpenNIViewer
         }
         index ++;
     }
-
 
     inline void convertColor( PointCloud::Ptr & cloud,
                        cv::Mat & mat,
