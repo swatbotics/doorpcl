@@ -68,22 +68,24 @@ class SimpleOpenNIViewer
         float i_rhoRes, i_thetaRes;
         int i_threshold, i_minLineLength, i_maxLineGap;
 
-        int blurSize, cannyIntensitySize, filterSize, cannyDepthSize,
-            intensityDilationSize, lineIncrease;
+        int blurSize, filterSize, intensityDilationSize, lineDilationSize;
+
+            //these control the parameters for canny edge detection
+        int cannyIntensitySize, cannyBinarySize;
+        int cannyIntensityLowThreshold, cannyIntensityHighThreshold;
+        int cannyBinaryLowThreshold, cannyBinaryHighThreshold;
 
         //get segmenter parameters from config file
-        config.get("maxNumPlanes", maxNumPlanes);
-        config.get("minSize", minSize);
+        config.get("maxPlaneNumber", maxNumPlanes);
+        config.get("minPlaneSize", minSize);
         optimize = config.getBool("optimize");
         config.get("planeThreshold", planeThreshold);
 
         //get filter parameters from config file
         config.get("blurSize", blurSize);
-        config.get("cannyIntensitySize", cannyIntensitySize);
         config.get("filterSize", filterSize);
-        config.get("cannyDepthSize", cannyDepthSize);
         config.get("intensityDilationSize", intensityDilationSize);
-        config.get("lineIncrease",lineIncrease);
+        config.get("lineDilationSize", lineDilationSize);
 
         //get Hough parameters from config file 
         config.get("binary_rhoRes", b_rhoRes);
@@ -99,6 +101,24 @@ class SimpleOpenNIViewer
         config.get("intensity_minLineLength", i_minLineLength);
         config.get("intensity_maxLineGap", i_maxLineGap);
 
+        //get the canny stuff.
+        config.get( "cannyIntensitySize", cannyIntensitySize);
+        config.get( "cannyBinarySize", cannyBinarySize );
+        config.get( "cannyIntensityLowThreshold", cannyIntensityLowThreshold);
+        config.get( "cannyIntensityHighThreshold", cannyIntensityHighThreshold);
+        config.get( "cannyBinaryLowThreshold", cannyBinaryLowThreshold);
+        config.get( "cannyBinaryHighThreshold", cannyBinaryHighThreshold);
+
+
+        //set the parameters for the segmenter.
+        segmenter = PlaneSegmenter( maxNumPlanes, minSize, 
+                                    optimize, planeThreshold );
+        segmenter.setHoughLinesBinary( b_rhoRes, b_thetaRes, b_threshold,
+                                       b_minLineLength, b_maxLineGap );
+        segmenter.setHoughLinesIntensity( i_rhoRes, i_thetaRes, i_threshold,
+                                          i_minLineLength, i_maxLineGap );
+        segmenter.setFilterParams(blurSize, filterSize,
+                                  intensityDilationSize, lineDilationSize);
 
 
         view1 = 0;
@@ -110,16 +130,7 @@ class SimpleOpenNIViewer
         image_viewer = new pcl::visualization::ImageViewer( "Image Viewer" );
 
         filename = "pcd_frames/sample";
-        segmenter = PlaneSegmenter( maxNumPlanes, minSize, 
-                                    optimize, planeThreshold );
-        segmenter.setHoughLinesBinary( b_rhoRes, b_thetaRes, b_threshold,
-                                       b_minLineLength, b_maxLineGap );
-        segmenter.setHoughLinesIntensity( i_rhoRes, i_thetaRes, i_threshold,
-                                          i_minLineLength, i_maxLineGap );
 
-        segmenter.setFilterParams(blurSize, cannyIntensitySize,
-                                  filterSize, cannyDepthSize,
-                                  intensityDilationSize, lineIncrease);
 
         colors.push_back( cv::Vec3i ( 255,   0,   0 ));
         colors.push_back( cv::Vec3i ( 0  , 255,   0 ));

@@ -4,24 +4,19 @@
 PlaneSegmenter::PlaneSegmenter( const std::string & configFileName ){
     SimpleConfig config( configFileName );
 
-    config.get("maxNumPlanes", maxNumPlanes);
-    config.get("minSize", minSize);
-    optimize = config.getBool("optimize");
-    config.get("planeThreshold", planeThreshold);
+    //get Hough parameters from config file 
+    config.get("binary_rhoRes", binary_rhoRes);
+    config.get("binary_thetaRes", binary_thetaRes);
+    config.get("binary_threshold", binary_threshold);
+    config.get("binary_minLineLength", binary_minLineLength);
+    config.get("binary_maxLineGap", binary_maxLineGap);
 
     //get Hough parameters from config file 
-    config.get("binary_rhoRes", b_rhoRes);
-    config.get("binary_thetaRes", b_thetaRes);
-    config.get("binary_threshold", b_threshold);
-    config.get("binary_minLineLength", b_minLineLength);
-    config.get("binary_maxLineGap", b_maxLineGap);
-
-    //get Hough parameters from config file 
-    config.get("intensity_rhoRes", i_rhoRes);
-    config.get("intensity_thetaRes", i_thetaRes);
-    config.get("intensity_threshold", i_threshold);
-    config.get("intensity_minLineLength", i_minLineLength);
-    config.get("intensity_maxLineGap", i_maxLineGap);
+    config.get("intensity_rhoRes", intensity_rhoRes);
+    config.get("intensity_thetaRes", intensity_thetaRes);
+    config.get("intensity_threshold", intensity_threshold);
+    config.get("intensity_minLineLength", intensity_minLineLength);
+    config.get("intensity_maxLineGap", intensity_maxLineGap);
 
     //get the canny stuff.
     config.get( "cannyIntensitySize", cannyIntensitySize);
@@ -37,6 +32,24 @@ PlaneSegmenter::PlaneSegmenter( const std::string & configFileName ){
     config.get( "intensityDilationSize", intensityDilationSize);
     config.get( "lineDilationSize", lineDilationSize );
 
+    double planeThreshold;
+    int minPlaneSize;
+    bool optimize;
+
+    config.get("maxPlaneNumber", maxPlaneNumber);
+    config.get("minPlaneSize", minPlaneSize);
+    optimize = config.getBool("optimize");
+    config.get("planeThreshold", planeThreshold);
+
+    // Optional
+    seg.setOptimizeCoefficients (optimize );
+    // Mandatory
+    seg.setModelType (pcl::SACMODEL_PLANE);
+    seg.setMethodType (pcl::SAC_RANSAC);
+    seg.setDistanceThreshold ( planeThreshold );
+
+
+    haveSetCamera = false;
 
 }
     
@@ -55,24 +68,6 @@ PlaneSegmenter::PlaneSegmenter( int maxNumPlanes, int minSize,
     seg.setMethodType (pcl::SAC_RANSAC);
     seg.setDistanceThreshold ( threshold );
 
-    binary_rhoRes = 1;
-    binary_thetaRes = CV_PI/180;
-    binary_threshold = 60;
-    binary_minLineLength = 60;
-    binary_maxLineGap = 20;
-
-    intensity_rhoRes = 1;
-    intensity_thetaRes = CV_PI/180;
-    intensity_threshold = 60;
-    intensity_minLineLength = 60;
-    intensity_maxLineGap = 20;
-
-    blurSize = 5;
-    cannyIntensitySize = 5;
-    filterSize = 5;
-    cannyDepthSize = 5;
-    intensityDilationSize = 10;
-    lineIncrease = 2;
 
     haveSetCamera = false;
 
@@ -111,7 +106,7 @@ void PlaneSegmenter::setHoughLinesBinary( float rho, float theta, int threshold,
     binary_maxLineGap = maxLineGap;
 }
 
-void setCannyParams( int binarySize, int binaryLowerThreshold,
+void PlaneSegmenter::setCannyParams( int binarySize, int binaryLowerThreshold,
                      int binaryUpperThreshold,
                      int intensitySize, int intensityLowerThreshold,
                      int intensityUpperThreshold ){
@@ -126,15 +121,13 @@ void setCannyParams( int binarySize, int binaryLowerThreshold,
 }
 
 
-void PlaneSegmenter::setFilterParams ( int blur, int cannyIntensity,
-                                       int filterSize, int cannyDepth,
-                                       int dilationSize, int lineInc)
+void PlaneSegmenter::setFilterParams ( int blur, int filterSize,
+                                       int intensityDilation, int lineDilation )
 {
     this->blurSize = blur;
     this->filterSize = filterSize;
-    this->cannyDepthSize = cannyDepth;
-    this->intensityDilationSize = dilationSize;
-    this->lineIncrease = lineInc;
+    this->intensityDilationSize = intensityDilation;
+    this->lineDilationSize = lineDilation;
 }
 
 void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud, 
@@ -296,13 +289,7 @@ inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
             cv::Mat intensityKernel = cv::Mat::ones( intensityDilationSize,
                                                      intensityDilationSize,
                                                                      CV_8U ); 
-            //apply the mask.
-            cout << "There is an error here. This must be fixed" << 
-                 << "this error is near line 240 - 280 in the find line function of"
-                 << "the findLine function in plane_segmenter.cpp";
 
-            //this should be the inverse binary image, not this image.
-            //this needs to be fixed.
             cv::erode( mask, mask, intensityKernel);
             intensity.copyTo( intensity, mask );
             
@@ -332,7 +319,7 @@ inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
     
 
 
-    cv::Mat kern = cv::Mat::ones( lineIncrease, lineIncrease, CV_8U ); 
+    cv::Mat kern = cv::Mat::ones( lineDilationSize, lineDilationSize, CV_8U ); 
     cv::dilate( binary, binary, kern);
 
     //dst, lines, rho_resolution, theta_resolution, threshold,

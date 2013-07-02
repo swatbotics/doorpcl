@@ -51,8 +51,8 @@ public:
 
     //sets parameters for several openCV filters that are used inside
     //the findLines function
-    void setFilterParams(int blur, int cannyIntensity, int filterSize,
-                         int cannyDepth, int dilationSize, int lineInc);
+    void setFilterParams(int blur, int filterSize,
+                         int intensityDilation, int lineDilation);
 
     void setCannyParams( int binarySize, int binaryLowerThreshold,
                          int binaryUpperThreshold,
@@ -72,7 +72,7 @@ private:
                                //image.
     int intensityDilationSize; //this is the size of the dilation on the intensity
                                //image.
-    int lineIncrease;      //This controls the amout by which the mask image
+    int lineDilationSize;      //This controls the amout by which the mask image
                                //is dilated to remove the edges of the plane
                                //from the canny edge detection consideration.
 

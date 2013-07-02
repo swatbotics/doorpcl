@@ -1,8 +1,8 @@
 #this is our config file
 
 #plane segmenter parameters
-maxNumPlanes = 6
-minSize = 50000
+maxPlaneNumber = 6
+minPlaneSize = 50000
 optimize = false
 planeThreshold = 0.06
 
