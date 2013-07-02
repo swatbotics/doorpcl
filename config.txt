@@ -7,10 +7,10 @@ optimize = false
 planeThreshold = 0.06
 
 #filter parameters
-blurSize = 10
-filterSize = 5
-intensityErosionSize = 10
-lineDilationSize = 2
+blurSize = 40
+filterSize = 10
+intensityErosionSize = 20
+lineDilationSize = 5
 
 #depth Houghlines parameters
 binary_rhoRes = 1
@@ -24,7 +24,7 @@ intensity_rhoRes = 1
 intensity_thetaRes = 0.0175
 intensity_threshold = 60
 intensity_minLineLength = 60
-intensity_maxLineGap = 20
+intensity_maxLineGap = 40
 
 #canny parameters
 cannyBinarySize = 5 

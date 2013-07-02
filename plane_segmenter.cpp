@@ -174,7 +174,7 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
  
         //transforms the lines in the plane into lines in space.
         linePositions.resize( linePositions.size() + 1 );
-        matrixLinesToPositions(coefficients, planarLines, linePositions.back() );
+        linesToPositions(coefficients, planarLines, linePositions.back() );
 
         linePositions.resize( linePositions.size() + 1 );        
         linesToPositions(coefficients, intensityLines, linePositions.back() );
