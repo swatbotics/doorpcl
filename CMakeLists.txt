@@ -2,17 +2,16 @@ cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
 
 set (CMAKE_CXX_FLAGS "-g")
 
-project(pcd_write)
-project(openni_grabber)
-project(random_sample_consensus)
-project(planar_segmentation)
-project(openni_viewer_simple)
 project(edge_detector)
 
 find_package(PCL 1.2 REQUIRED)
 include(FindPkgConfig)
 pkg_search_module(OPENCV REQUIRED opencv>=2.3 opencv-2.3.1)
+pkg_search_module(FLANN REQUIRED flann>=1.7 )
+
 include_directories(${OPENCV_INCLUDE_DIRS})
+include_directories(${FLANN_INCLUDE_DIRS})
+
 include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})

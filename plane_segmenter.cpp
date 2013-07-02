@@ -177,7 +177,7 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
         matrixLinesToPositions(coefficients, planarLines, linePositions.back() );
 
         linePositions.resize( linePositions.size() + 1 );        
-        matrixLinesToPositions(coefficients, intensityLines, linePositions.back() );
+        linesToPositions(coefficients, intensityLines, linePositions.back() );
 
         filterOutIndices( *outliers, inliers->indices );
 
@@ -369,9 +369,9 @@ inline void PlaneSegmenter::linesToPositions(
             const float delta_u = u0 - u;
             const float delta_v = v0 - v;
 
-            const float z = -D / ( A*delta_u/fx + B*delta_v/fy + C );
-            const float x = delta_u * z / fx;
-            const float y = delta_v * z / fy;
+            const float z = D / ( A*delta_u/fx + B*delta_v/fy - C );
+            const float x = - delta_u * z / fx;
+            const float y = - delta_v * z / fy;
 
             linePositions.push_back( pcl::PointXYZ( x, y, z ) );
         }
