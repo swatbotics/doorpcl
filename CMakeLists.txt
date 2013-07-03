@@ -1,16 +1,14 @@
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
 
-set (CMAKE_CXX_FLAGS "-g")
+set (CMAKE_CXX_FLAGS "-g -O3")
 
 project(edge_detector)
 
 find_package(PCL 1.2 REQUIRED)
 include(FindPkgConfig)
 pkg_search_module(OPENCV REQUIRED opencv>=2.3 opencv-2.3.1)
-pkg_search_module(FLANN REQUIRED flann>=1.7 )
 
 include_directories(${OPENCV_INCLUDE_DIRS})
-include_directories(${FLANN_INCLUDE_DIRS})
 
 include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})

@@ -5,12 +5,21 @@ maxPlaneNumber = 6
 minPlaneSize = 50000
 optimize = false
 planeThreshold = 0.06
+sacMethod = 0
+   #different sac segmentation types
+   #RANSAC  = 0
+   #LMEDS   = 1
+   #MSAC    = 2
+   #RRANSAC = 3
+   #RMSAC   = 4
+   #MLESAC  = 5
+   #PROSAC  = 6
 
 #filter parameters
-blurSize = 40
+blurSize = 2
 filterSize = 10
 intensityErosionSize = 20
-lineDilationSize = 5
+lineDilationSize = 2
 
 #depth Houghlines parameters
 binary_rhoRes = 1
@@ -22,14 +31,14 @@ binary_maxLineGap = 20
 #color Houghlines parameters
 intensity_rhoRes = 1
 intensity_thetaRes = 0.0175
-intensity_threshold = 60
-intensity_minLineLength = 60
-intensity_maxLineGap = 40
+intensity_threshold = 50
+intensity_minLineLength = 50
+intensity_maxLineGap = 20
 
 #canny parameters
-cannyBinarySize = 5 
-cannyBinaryLowThreshold = 50
+cannyBinarySize = 5
+cannyBinaryLowThreshold = 100
 cannyBinaryHighThreshold = 200
-cannyIntensitySize = 5
+cannyIntensitySize = 3
 cannyIntensityLowThreshold = 100
 cannyIntensityHighThreshold = 200

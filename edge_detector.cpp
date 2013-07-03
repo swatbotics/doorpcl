@@ -60,68 +60,9 @@ class SimpleOpenNIViewer
                             u0( -1), v0(-1), config( configFile )
                             {
  
-        float b_rhoRes, b_thetaRes;
-        int b_threshold, b_minLineLength, b_maxLineGap;
-
-        float i_rhoRes, i_thetaRes;
-        int i_threshold, i_minLineLength, i_maxLineGap;
-
-        int blurSize, filterSize, intensityErosionSize, lineDilationSize;
-
-        //these control the parameters for canny edge detection
-        int cannyIntensitySize, cannyBinarySize;
-        int cannyIntensityLowThreshold, cannyIntensityHighThreshold;
-        int cannyBinaryLowThreshold, cannyBinaryHighThreshold;
-
-        //get segmenter parameters from config file
-        config.get("maxPlaneNumber", maxNumPlanes);
-        config.get("minPlaneSize", minSize);
-        optimize = config.getBool("optimize");
-        config.get("planeThreshold", planeThreshold);
-
-        //get filter parameters from config file
-        config.get("blurSize", blurSize);
-        config.get("filterSize", filterSize);
-        config.get("intensityErosionSize", intensityErosionSize);
-        config.get("lineDilationSize", lineDilationSize);
-
-        //get Hough parameters from config file 
-        config.get("binary_rhoRes", b_rhoRes);
-        config.get("binary_thetaRes", b_thetaRes);
-        config.get("binary_threshold", b_threshold);
-        config.get("binary_minLineLength", b_minLineLength);
-        config.get("binary_maxLineGap", b_maxLineGap);
-
-        //get Hough parameters from config file 
-        config.get("intensity_rhoRes", i_rhoRes);
-        config.get("intensity_thetaRes", i_thetaRes);
-        config.get("intensity_threshold", i_threshold);
-        config.get("intensity_minLineLength", i_minLineLength);
-        config.get("intensity_maxLineGap", i_maxLineGap);
-
-        //get the canny parameters from config file
-        config.get( "cannyIntensitySize", cannyIntensitySize);
-        config.get( "cannyBinarySize", cannyBinarySize );
-        config.get( "cannyIntensityLowThreshold", cannyIntensityLowThreshold);
-        config.get( "cannyIntensityHighThreshold", cannyIntensityHighThreshold);
-        config.get( "cannyBinaryLowThreshold", cannyBinaryLowThreshold);
-        config.get( "cannyBinaryHighThreshold", cannyBinaryHighThreshold);
-
-
-        //set the parameters for the segmenter
-        segmenter = PlaneSegmenter( maxNumPlanes, minSize, 
-                                    optimize, planeThreshold );
-        segmenter.setHoughLinesBinary( b_rhoRes, b_thetaRes, b_threshold,
-                                       b_minLineLength, b_maxLineGap );
-        segmenter.setHoughLinesIntensity( i_rhoRes, i_thetaRes, i_threshold,
-                                          i_minLineLength, i_maxLineGap );
-        segmenter.setFilterParams(blurSize, filterSize,
-                                  intensityErosionSize, lineDilationSize);
-        segmenter.setCannyParams(cannyBinarySize, cannyBinaryLowThreshold,
-                                 cannyBinaryHighThreshold, cannyIntensitySize,
-                                 cannyIntensityLowThreshold,
-                                 cannyIntensityHighThreshold);
-
+        //initialize the segmenter class
+        segmenter = PlaneSegmenter( configFile );
+       
         view1 = 0;
         view2 = 0;
         line_viewer = new pcl::visualization::PCLVisualizer( "Line Viewer" ) ;
@@ -130,7 +71,7 @@ class SimpleOpenNIViewer
         //cloud_viewer = new pcl::visualization::CloudViewer( "Cloud Viewer" );
         image_viewer = new pcl::visualization::ImageViewer( "Image Viewer" );
 
-        filename = "pcd_frames/sample";
+        filename = "../frames/sample";
 
         //array of colors we will use to draw edge lines
         colors.push_back( cv::Vec3i ( 255,   0,   0 ));
@@ -162,7 +103,10 @@ class SimpleOpenNIViewer
                 const pcl::PointXYZ start = lines[ j ];
                 const pcl::PointXYZ end   = lines[ j+1 ];
                 
-                cv::Vec3i color = colors[ i % colors.size() ];
+                cv::Vec3i color = colors[ (i / 2) % colors.size() ];
+                if ( i % 2 == 1 ){
+                    color *= 0.2;
+                }
                 line_viewer->addLine(start, end,
                                 color[0], color[1], color[2],
                                 "line" +  boost::to_string( j*100 +i ) , view1 );
@@ -208,21 +152,24 @@ class SimpleOpenNIViewer
     //algorithm
     void cloud_cb_ (const PointCloud::ConstPtr &cloud)
     {
-        if ( !viewerIsInitialized ){
-            initViewer( cloud );
-        }
-
-        if ( !line_viewer->wasStopped() ){
-            if ( doWrite ){
+        if ( doWrite ){
                 savePointCloud( *cloud );
+        }
+        else{
+
+            if ( !viewerIsInitialized ){
+                initViewer( cloud );
             }
 
-            std::vector< LinePosArray > planes;
-            segmenter.segment( cloud, planes, image_viewer );
-            updateViewer( cloud, planes );
+            if ( !line_viewer->wasStopped() ){
+
+                std::vector< LinePosArray > planes;
+                segmenter.segment( cloud, planes, image_viewer );
+                updateViewer( cloud, planes );
+            }
         }
 
-      cout << "ended Call back\n";
+        cout << "ended Call back\n";
     }
     
 
@@ -244,6 +191,7 @@ class SimpleOpenNIViewer
                 segmenter.segment( cloud, planes, image_viewer );
                 updateViewer( cloud, planes );
             }
+
         }
 
     }

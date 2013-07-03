@@ -4,6 +4,24 @@
 PlaneSegmenter::PlaneSegmenter( const std::string & configFileName ){
     SimpleConfig config( configFileName );
 
+    double planeThreshold;
+    int sacMethod;
+    bool optimize;
+    
+    //get plane segmentation parameters
+    config.get("maxPlaneNumber", maxPlaneNumber);
+    config.get("minPlaneSize", minPlaneSize);
+    optimize = config.getBool("optimize");
+    config.get("planeThreshold", planeThreshold);
+    config.get("sacMethod" , sacMethod );
+
+    // Optional
+    seg.setOptimizeCoefficients (optimize );
+    // Mandatory
+    seg.setModelType (pcl::SACMODEL_PLANE);
+    seg.setMethodType ( sacMethod );
+    seg.setDistanceThreshold ( planeThreshold );
+
     //get Hough parameters from config file 
     config.get("binary_rhoRes", binary_rhoRes);
     config.get("binary_thetaRes", binary_thetaRes);
@@ -32,22 +50,6 @@ PlaneSegmenter::PlaneSegmenter( const std::string & configFileName ){
     config.get( "intensityErosionSize", intensityErosionSize);
     config.get( "lineDilationSize", lineDilationSize );
 
-    double planeThreshold;
-    int minPlaneSize;
-    bool optimize;
-    
-    //get plane segmentation parameters
-    config.get("maxPlaneNumber", maxPlaneNumber);
-    config.get("minPlaneSize", minPlaneSize);
-    optimize = config.getBool("optimize");
-    config.get("planeThreshold", planeThreshold);
-
-    // Optional
-    seg.setOptimizeCoefficients (optimize );
-    // Mandatory
-    seg.setModelType (pcl::SACMODEL_PLANE);
-    seg.setMethodType (pcl::SAC_RANSAC);
-    seg.setDistanceThreshold ( planeThreshold );
 
 
     haveSetCamera = false;
@@ -57,14 +59,15 @@ PlaneSegmenter::PlaneSegmenter( const std::string & configFileName ){
 
 //PlaneSegmenter constructor
 PlaneSegmenter::PlaneSegmenter( int maxNumPlanes, int minSize,
-                                bool optimize, float threshold ) : 
+                                bool optimize, float threshold,
+                                int sacMethod ) : 
         maxPlaneNumber( maxNumPlanes ), minPlaneSize( minSize) 
 {
     // Optional
     seg.setOptimizeCoefficients (optimize );
     // Mandatory
     seg.setModelType (pcl::SACMODEL_PLANE);
-    seg.setMethodType (pcl::SAC_RANSAC);
+    seg.setMethodType ( sacMethod );
     seg.setDistanceThreshold ( threshold );
 
     haveSetCamera = false;
@@ -132,7 +135,7 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
                              std::vector< LinePosArray > & linePositions,
                              pcl::visualization::ImageViewer * viewer ) 
 {   
-
+    cout << "Max plane: " << maxPlaneNumber;
     assert( haveSetCamera );
 
     pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
@@ -182,8 +185,9 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
         filterOutIndices( *outliers, inliers->indices );
 
     }
-    while( linePositions.size() < maxPlaneNumber ||
+    while( linePositions.size() < maxPlaneNumber * 2 &&
            inliers->indices.size() > minPlaneSize   );
+
 }
 
 //Removes segmented planes from the point cloud
@@ -331,17 +335,34 @@ inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
     //draw the lines;
     if ( viewer != NULL ){     
         cv::Mat cdst;
-        cv::cvtColor(maskedIntensity, cdst, CV_GRAY2BGR);
+        bool seeBinary = true;
 
-        for( size_t i = 0; i < intensityLines.size(); i++ )
-        {
-            cv::Vec4i l = intensityLines[i];
-            cv::line( cdst, cv::Point(l[0], l[1]),
-                            cv::Point(l[2], l[3]),
-                            cv::Scalar(0,0,255),
-                            3, CV_AA);
+        if ( seeBinary ){
+            cv::cvtColor(binary, cdst, CV_GRAY2BGR);
+
+            for( size_t i = 0; i < planarLines.size(); i++ )
+            {
+                cv::Vec4i l = planarLines[i];
+                cv::line( cdst, cv::Point(l[0], l[1]),
+                                cv::Point(l[2], l[3]),
+                                cv::Scalar(0,0,255),
+                                3, CV_AA);
+            }
+        }
+        else {
+            cv::cvtColor(maskedIntensity, cdst, CV_GRAY2BGR);
+
+            for( size_t i = 0; i < intensityLines.size(); i++ )
+            {
+                cv::Vec4i l = intensityLines[i];
+                cv::line( cdst, cv::Point(l[0], l[1]),
+                                cv::Point(l[2], l[3]),
+                                cv::Scalar(0,0,255),
+                                3, CV_AA);
+            }
         }
         viewer->showRGBImage( cdst.data, cdst.cols, cdst.rows );
+
     }          
 }
 

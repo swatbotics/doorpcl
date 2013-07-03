@@ -30,7 +30,8 @@ public:
 
     PlaneSegmenter( const std::string & configFileName );
     PlaneSegmenter(int maxNumPlanes=6, int minSize=50000,
-                   bool optimize=false, float threshold=0.03 );
+                   bool optimize=false, float threshold=0.03, 
+                   int sacMethod=0);
 
     //call this to actually run the segmentation algorithm.
     //if the user wants to display an image of the lines and planes in 2d, then
