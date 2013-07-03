@@ -135,11 +135,13 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
                              std::vector< LinePosArray > & linePositions,
                              pcl::visualization::ImageViewer * viewer ) 
 {   
-    cout << "Max plane: " << maxPlaneNumber;
+    
+    //if the camera parameters have not been set, the program will not work, so abort
     assert( haveSetCamera );
 
+    //initialize the model coefficients for the plane and 
+    //send the cloud to the segmenter for segmentation
     pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
-
     seg.setInputCloud ( cloud->makeShared() );
 
     //initialize the indices containers, set outliers to be all of the
@@ -153,24 +155,26 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
     }
 
 
-    //We get two planes, or the size of the inliers is reduced to
-    //a very low amout;
+    //This do while loop is the main segmentation loop.
+    //The loop quits once the max number of planes has been reached, or
+    //until the segmenter returns a plane that is smaller than the 
+    //minPlaneSize.
     do{
 
         //this performs segmentation on only the indices that are 
-        //in outliers
+        //in outliers. 
         seg.setIndices( outliers );
+
+        //Perform segmentation of the plane. store the coefficients of the plane 
+        //, and the inliers on the plane.
+        //THe coefficients are in Ax + By + Cz + D = 0 form. 
         seg.segment (*inliers, *coefficients);
+
+        //If the size of the found plane is too small, exit the segmenter.
+        if ( inliers->indices.size () <= minPlaneSize ) { return; }
         
-        //copy plane 
-        if (inliers->indices.size () == 0)
-        {
-            if ( linePositions.size() == 0 ){
-                PCL_ERROR("Could not estimate a plane for the given data.");
-            }
-            return;
-        }
-        
+        //Find the lines in the plane and store them in the planarLines and
+        //intensityLines vectors.
         LineArray planarLines;
         LineArray intensityLines;
         findLines( inliers, cloud, planarLines, intensityLines, viewer );
@@ -178,26 +182,40 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
         //transforms the lines in the plane into lines in space.
         linePositions.resize( linePositions.size() + 1 );
         linesToPositions(coefficients, planarLines, linePositions.back() );
-
         linePositions.resize( linePositions.size() + 1 );        
         linesToPositions(coefficients, intensityLines, linePositions.back() );
 
+        //remove the indices in from outliers that are in inliers.
+        //This allows plane segmentation to be repeated on all of the points
+        //that are not in planes that have already been found.
         filterOutIndices( *outliers, inliers->indices );
 
     }
-    while( linePositions.size() < maxPlaneNumber * 2 &&
-           inliers->indices.size() > minPlaneSize   );
+    //if the number of planes found is greater than or equal to the max number of 
+    //planes, then quit
+    while( linePositions.size() < maxPlaneNumber );
+
 
 }
 
 //Removes segmented planes from the point cloud
+//This algorithm has runs in linear time in the amount of outliers.
+//This algorithm modifies the 'larger' vector in place
+//Several assumptions must hold for this algorithm to work: 
+//      1. As the index increases, the value of the ints stored must increase
+//          as well.
+//      2. The vector 'remove' must be a subset of 'larger' 
+//      3. 
 inline void PlaneSegmenter::filterOutIndices( std::vector< int > & larger,
                        const std::vector<int> & remove){
-    int j = 0;
-    int k = 0;
+    int j = 0; // the index into the 'remove' vector
+    int k = 0; // the index into the 'larger' vector
+               // This index holds the next place in 'larger' that an index will
+               // be stored, facilitating the in place modification of 'larger'
+
     for( int i = 0; i < larger.size() ; i ++ ){
-        if ( j < remove.size() &&
-             larger[i] == remove[j] ){
+
+        if ( j < remove.size() && larger[i] == remove[j] ){
             j++;
         }
         else{
@@ -278,50 +296,43 @@ inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
 
 
     bool getIntensity = true;
-    try{
-
-        if ( getIntensity ){
-            //the blur will smooth out the intensity edges.
-            cv::blur( intensity, intensity, cv::Size(blurSize , blurSize) );
-            cv::Canny(intensity, intensity, cannyIntensityLowThreshold,
-                                            cannyIntensityHighThreshold,
-                                            cannyIntensitySize );
-            
-            //remove the noise added by including the edges.
-            //This will increase the size of the mask image so that 
-            //it can get rid of the edges when copied over.
-            cv::Mat intensityKernel = cv::Mat::ones( intensityErosionSize,
-                                                     intensityErosionSize,
-                                                                     CV_8U ); 
-
-            cv::erode( mask, mask, intensityKernel);
-            intensity.copyTo( maskedIntensity, mask );
-            
-        }
-
-        //TODO : find out why the copy is necessary: For some reason,
-        //without the copy, the canny edge detector does not work.
-        //binary.copyTo(binary);
-
-        //this filter cleans up the noise from the sensor.        
-        //cv::blur( dst, dst, cv::Size(size , size) );
-        cv::Mat kernel = cv::Mat::ones( filterSize, filterSize, CV_8U ); 
-        cv::dilate( binary, binary, kernel);
-        cv::erode( binary, binary, kernel );
-        cv::Canny(binary, binary, cannyBinaryLowThreshold,
-                                  cannyBinaryHighThreshold,
-                                  cannyBinarySize);
+    ///////////////////////////////////////////////////////////////////////////
+    //Perform Canny Edge Detection
+    if ( getIntensity ){
+        //the blur will smooth out the intensity edges.
+        cv::blur( intensity, intensity, cv::Size(blurSize , blurSize) );
+        cv::Canny(intensity, intensity, cannyIntensityLowThreshold,
+                                        cannyIntensityHighThreshold,
+                                        cannyIntensitySize );
         
+        //remove the noise added by including the edges.
+        //This will increase the size of the mask image so that 
+        //it can get rid of the edges when copied over.
+        cv::Mat intensityKernel = cv::Mat::ones( intensityErosionSize,
+                                                 intensityErosionSize,
+                                                                 CV_8U ); 
 
-
+        cv::erode( mask, mask, intensityKernel);
+        intensity.copyTo( maskedIntensity, mask );
+        
     }
-    catch ( std::exception & e ){
-        cout << "Error with canny edge detector" << e.what() << "\n";
-        return;
-    }
-    
+
+    //TODO : find out why the copy is necessary: For some reason,
+    //without the copy, the canny edge detector does not work.
+    //binary.copyTo(binary);
+
+    //this filter cleans up the noise from the sensor.        
+    //cv::blur( dst, dst, cv::Size(size , size) );
+    cv::Mat kernel = cv::Mat::ones( filterSize, filterSize, CV_8U ); 
+    cv::dilate( binary, binary, kernel);
+    cv::erode( binary, binary, kernel );
+    cv::Canny(binary, binary, cannyBinaryLowThreshold,
+                              cannyBinaryHighThreshold,
+                              cannyBinarySize);
 
 
+    /////////////////////////////////////////////////////////////////////
+    //Perform the hough lines detection algorithm
     cv::Mat kern = cv::Mat::ones( lineDilationSize, lineDilationSize, CV_8U ); 
     cv::dilate( binary, binary, kern);
 
@@ -332,9 +343,13 @@ inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
                     intensity_thetaRes, intensity_threshold,
                     intensity_minLineLength, intensity_maxLineGap);
 
-    //draw the lines;
+
+    //if there is a viewer, then display a set of lines on the viewer.
     if ( viewer != NULL ){     
         cv::Mat cdst;
+
+        //TODO : make this a configurable option. Right now, this is simply
+        //a convenience mechanism.
         bool seeBinary = true;
 
         if ( seeBinary ){
@@ -389,6 +404,12 @@ inline void PlaneSegmenter::linesToPositions(
 
             const float delta_u = u0 - u;
             const float delta_v = v0 - v;
+
+            //These are the analytical solutions for x y and z.
+            //They were solved from the following three equations
+            //      Ax + By + Cz + D = 0
+            //      ( fx * x ) + ( z * delta_u ) = 0 
+            //      ( fy * y ) + ( z * delta_v ) = 0 
 
             const float z = D / ( A*delta_u/fx + B*delta_v/fy - C );
             const float x = - delta_u * z / fx;
