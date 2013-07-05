@@ -31,14 +31,14 @@ binary_maxLineGap = 20
 #color Houghlines parameters
 intensity_rhoRes = 1
 intensity_thetaRes = 0.0175
-intensity_threshold = 50
-intensity_minLineLength = 50
-intensity_maxLineGap = 20
+intensity_threshold = 80
+intensity_minLineLength = 30
+intensity_maxLineGap = 10
 
 #canny parameters
 cannyBinarySize = 5
 cannyBinaryLowThreshold = 100
 cannyBinaryHighThreshold = 200
 cannyIntensitySize = 3
-cannyIntensityLowThreshold = 100
-cannyIntensityHighThreshold = 200
+cannyIntensityLowThreshold = 50
+cannyIntensityHighThreshold = 100

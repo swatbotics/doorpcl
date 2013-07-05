@@ -71,7 +71,7 @@ class SimpleOpenNIViewer
         //cloud_viewer = new pcl::visualization::CloudViewer( "Cloud Viewer" );
         image_viewer = new pcl::visualization::ImageViewer( "Image Viewer" );
 
-        filename = "../frames/sample";
+        filename = "../drexelFrames/sample";
 
         //array of colors we will use to draw edge lines
         colors.push_back( cv::Vec3i ( 255,   0,   0 ));
@@ -238,13 +238,18 @@ class SimpleOpenNIViewer
     void readPointCloud(PointCloud::Ptr & cloud)
     {
         static int index = 0;
-        if (pcl::io::loadPCDFile<Point> (filename + 
-                                         boost::to_string( index )
-                                         +".pcd", *cloud) == -1)
-        {
-            cerr << "Couldn't read file "+filename+
-                     boost::to_string( index ) +".pcd" << endl;
-            exit(-1);
+        try {
+            if (pcl::io::loadPCDFile<Point> (filename + 
+                                             boost::to_string( index )
+                                             +".pcd", *cloud) == -1)
+            {
+                cerr << "Couldn't read file "+filename+
+                         boost::to_string( index ) +".pcd" << endl;
+                exit(-1);
+            }
+        }
+        catch (std::exception &e){
+            cout << "Error reading pcd file" << e.what() << endl;
         }
         index ++;
     }
