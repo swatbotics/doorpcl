@@ -152,21 +152,21 @@ class SimpleOpenNIViewer
     //algorithm
     void cloud_cb_ (const PointCloud::ConstPtr &cloud)
     {
-        if ( doWrite ){
-                savePointCloud( *cloud );
+        if ( !viewerIsInitialized ){
+            initViewer( cloud );
         }
-        else{
 
-            if ( !viewerIsInitialized ){
-                initViewer( cloud );
-            }
 
-            if ( !line_viewer->wasStopped() ){
 
-                std::vector< LinePosArray > planes;
+        if ( !line_viewer->wasStopped() ){
+
+            std::vector< LinePosArray > planes;
+            if ( doWrite ){
+                savePointCloud( *cloud );
+            } else {
                 segmenter.segment( cloud, planes, image_viewer );
-                updateViewer( cloud, planes );
             }
+            updateViewer( cloud, planes );
         }
 
         cout << "ended Call back\n";
@@ -226,10 +226,12 @@ class SimpleOpenNIViewer
     void savePointCloud(const PointCloud & cloud)
     {
         static int index = 0;
+
         pcl::io::savePCDFileBinary(filename + 
                                    boost::to_string( index ) + ".pcd"
                                    , cloud);
         index ++;
+        cout << "Saving point cloud number: " << index << "\n";
     }
 
     //reads existing pcd files
@@ -246,6 +248,8 @@ class SimpleOpenNIViewer
         }
         index ++;
     }
+
+
 
     inline void convertColor( PointCloud::Ptr & cloud,
                        cv::Mat & mat,
