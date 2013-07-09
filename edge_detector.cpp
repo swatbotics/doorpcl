@@ -8,11 +8,85 @@
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/visualization/image_viewer.h>
 #include <pcl/common/common_headers.h>
-
+#include <pcl/features/normal_3d.h>
+#include <pcl/console/parse.h>
 #include <boost/thread/thread.hpp>
 #include "plane_segmenter.h"
 
 #include "SimpleConfig.h"
+
+unsigned int text_id = 0;
+
+
+//mouse click callback- currently prints out location of mouse click
+//on viewer
+//TODO: return plane that mouse click location is a member of
+void mouseClick(const pcl::visualization::MouseEvent &event,
+                    void* segmenter)
+{  
+    PlaneSegmenter * seg = ( PlaneSegmenter *) segmenter;
+     
+    if (event.getButton () == 
+        pcl::visualization::MouseEvent::RightButton)
+    {    
+
+        seg->addDoorPoint( event.getX() , event.getY() );
+        //cout << "Door Point: " << seg->doorPoints.back() << "\n";
+        if (seg->doorPoints.size() == 4)
+        {
+        }
+
+    }
+} 
+
+
+//keyboard event handler callback
+void keyboardEventOccurred (const pcl::visualization::KeyboardEvent
+                            &event, void* segmenter )
+{
+    PlaneSegmenter * seg = ( PlaneSegmenter *) segmenter;
+     
+    //show previous plane
+    if (event.getKeySym () == "a" && event.keyDown ())
+    {
+        //do things
+        seg->frame_index--;
+        if (seg->frame_index < 0)
+        {
+            seg->frame_index = seg->planes.size() - 1;
+        }
+        cout << "displaying previous frame" << endl;
+        
+    }
+
+    //show next plane
+    else if (event.getKeySym () == "d" && event.keyDown ())
+    {
+        //do different things
+        seg->frame_index++;
+        if (seg->frame_index >= seg->planes.size())
+        {
+            seg->frame_index = 0;
+        }
+        cout << "displaying next frame" << endl;
+    }
+
+    //pause and unpause
+    else if (event.getKeySym () == "p" && event.keyDown ())
+    {
+        if (seg->waiting)
+        {
+            seg->waiting = false;
+            cout << "resuming" << endl;
+        }
+        else
+        {
+            seg->waiting = true;
+            cout << "pausing" << endl;
+        }
+    }
+}
+
 
 class SimpleOpenNIViewer
 {
@@ -34,6 +108,7 @@ class SimpleOpenNIViewer
     pcl::visualization::PCLVisualizer * line_viewer;
     //pcl::visualization::CloudViewer * cloud_viewer;
     pcl::visualization::ImageViewer * image_viewer;
+    pcl::visualization::ImageViewer * plane_viewer;
 
     std::string filename;
 
@@ -52,6 +127,7 @@ class SimpleOpenNIViewer
 
     SimpleConfig config;
 
+  
     SimpleOpenNIViewer ( const std::string & configFile )
                           : deviceFocalLength( 530.551),
                             pixel_size( 1.075 ),
@@ -68,13 +144,12 @@ class SimpleOpenNIViewer
         line_viewer = new pcl::visualization::PCLVisualizer( "Line Viewer" ) ;
         line_viewer->initCameraParameters();
         
-        //cloud_viewer = new pcl::visualization::CloudViewer( "Cloud Viewer" );
         image_viewer = new pcl::visualization::ImageViewer( "Image Viewer" );
+        plane_viewer = new pcl::visualization::ImageViewer( "Plane Viewer" );
 
         filename = "../drexelFrames/sample";
 
         //array of colors we will use to draw edge lines
-        colors.push_back( cv::Vec3i ( 255,   0,   0 ));
         colors.push_back( cv::Vec3i ( 0  , 255,   0 ));
         colors.push_back( cv::Vec3i (   0,   0, 255 ));
         colors.push_back( cv::Vec3i ( 255, 255,   0 ));
@@ -86,6 +161,8 @@ class SimpleOpenNIViewer
 
     }
 
+
+    
     //create a viewer that holds lines and a point cloud.
     void updateViewer( const PointCloud::ConstPtr &cloud,
                        const std::vector< LinePosArray > & planes )
@@ -109,7 +186,8 @@ class SimpleOpenNIViewer
                 }
                 line_viewer->addLine(start, end,
                                 color[0], color[1], color[2],
-                                "line" +  boost::to_string( j*100 +i ) , view1 );
+                                "line" +  boost::to_string( j*100 +i ),
+                                 view1 );
             }
 
         }
@@ -120,6 +198,8 @@ class SimpleOpenNIViewer
         line_viewer->spinOnce (100);
         
     }
+    
+
     
     //initialize point cloud viewer
     void initViewer( const PointCloud::ConstPtr & cloud ){
@@ -135,7 +215,8 @@ class SimpleOpenNIViewer
          
         line_viewer->addPointCloud<Point> ( cloud, rgb,  "cloud", view2);
         line_viewer->setPointCloudRenderingProperties 
-           (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "cloud", view2);
+           (pcl::visualization::PCL_VISUALIZER_POINT_SIZE,
+            1, "cloud", view2);
         line_viewer->setBackgroundColor( 0, 0, 0, view2 );
         line_viewer->setBackgroundColor( 0.1, 0.1, 0.1 , view1 );
         line_viewer->addCoordinateSystem (0.1);
@@ -144,6 +225,18 @@ class SimpleOpenNIViewer
         image_viewer->setPosition( 700, 10 );
         image_viewer->setSize( 640, 480 );
         
+        plane_viewer->setPosition( 60, 10 );
+        plane_viewer->setSize( 640, 480 );
+
+        /*
+        boost::function<
+          void (const PointCloud::ConstPtr&)> keys =
+          boost::bind (&SimpleOpenNIViewer::keyboardEventOccurred, this, _1);
+        */
+
+        plane_viewer->registerMouseCallback(mouseClick, (void*)&segmenter);
+        plane_viewer->registerKeyboardCallback( keyboardEventOccurred,
+                                                (void*)&segmenter );
         viewerIsInitialized = true;
 
     }
@@ -152,11 +245,10 @@ class SimpleOpenNIViewer
     //algorithm
     void cloud_cb_ (const PointCloud::ConstPtr &cloud)
     {
+
         if ( !viewerIsInitialized ){
             initViewer( cloud );
         }
-
-
 
         if ( !line_viewer->wasStopped() ){
 
@@ -168,11 +260,10 @@ class SimpleOpenNIViewer
             }
             updateViewer( cloud, planes );
         }
-
+        waitAndDisplay();
         cout << "ended Call back\n";
     }
-    
-
+   
     //this program will run until the reader throws an error about 
     //a non-existant file.
     void runWithInputFile(){
@@ -190,10 +281,84 @@ class SimpleOpenNIViewer
 
                 segmenter.segment( cloud, planes, image_viewer );
                 updateViewer( cloud, planes );
-            }
-
+            }  
+            waitAndDisplay();        
         }
 
+    }
+
+    void waitAndDisplay ()
+    {
+        if (segmenter.planes.size() == 0 ){
+            return;
+        }
+
+        segmenter.frame_index = 0;
+        while (segmenter.waiting)
+        {
+
+            const cv::Mat & matrix = 
+                    segmenter.planes[ segmenter.frame_index ].image;
+
+            plane_viewer->showRGBImage( matrix.data, matrix.cols, matrix.rows);
+            plane_viewer->spinOnce();
+            drawLines();
+        }
+    }
+
+
+    void drawLines ()
+    {
+        removeAllDoorLines();
+
+        cout << "entering draw Lines with " << segmenter.doorPoints.size()
+             << " points." << endl;
+        if ( segmenter.doorPoints.size() < 2 ){
+            cout << "\texiting due to lack of points" << endl;
+            return;
+        }
+
+
+        assert(segmenter.drawPoints.size() == segmenter.doorPoints.size());
+
+        for ( int i = 0; i < segmenter.drawPoints.size() ; i ++ ){
+            if ( i == segmenter.drawPoints.size() - 1 &&
+                 segmenter.drawPoints.size() != 4        ){
+                return;
+            }
+
+            pcl::PointXYZ start3D, end3D;
+            Eigen::Vector2i start2D, end2D;
+            start2D = segmenter.drawPoints[ i ];
+            start3D = segmenter.doorPoints[ i ];
+            
+            if ( i + 1 >= segmenter.drawPoints.size() ){
+                end2D   = segmenter.drawPoints[ 0 ];
+                end3D = segmenter.doorPoints[ 0 ];
+            } else{
+                end2D   = segmenter.drawPoints[ i+1 ];
+                end3D = segmenter.doorPoints[ i + 1 ];
+            }
+            
+
+            plane_viewer->addLine(start2D[0], start2D[1], end2D[0], end2D[1],
+                            1.0, 0, 0,
+                            "doorLine" +  boost::to_string( i ) );
+            line_viewer->addLine(start3D, end3D,
+                            255, 0, 0,
+                            "doorLine" +  boost::to_string( i ),
+                             view1 );
+
+        }
+    }
+
+    void removeAllDoorLines(){
+        for ( int i = 0; i < segmenter.doorPoints.size() ; i ++ ){
+            std::string id = "doorLine" + boost::to_string( i );
+            plane_viewer->removeLayer( id );
+            line_viewer->removeShape( id ); 
+
+        }
     }
 
     void run ()

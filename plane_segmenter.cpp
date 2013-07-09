@@ -7,7 +7,11 @@ PlaneSegmenter::PlaneSegmenter( const std::string & configFileName ){
     double planeThreshold;
     int sacMethod;
     bool optimize;
-    
+   
+    frame_index = 0;
+
+    waiting = true;
+
     //get plane segmentation parameters
     config.get("maxPlaneNumber", maxPlaneNumber);
     config.get("minPlaneSize", minPlaneSize);
@@ -130,6 +134,46 @@ void PlaneSegmenter::setFilterParams ( int blur, int filterSize,
     this->lineDilationSize = lineDilation;
 }
 
+void PlaneSegmenter::addDoorPoint ( int u, int v)
+{
+    //extract the coefficients of the plane
+    const float A = planes[ frame_index ].coeffs.values[0];
+    const float B = planes[ frame_index ].coeffs.values[1];
+    const float C = planes[ frame_index ].coeffs.values[2];
+    const float D = planes[ frame_index ].coeffs.values[3];
+
+    //this corrects for the inversion of the axes in
+    //the pcl image viewer point indexing.
+    //const int _u = u0 * 2 - u;
+    const int _v = v0 * 2 - v;
+
+    const float delta_u = u0 - u;
+    const float delta_v = v0 - _v;
+
+    //These are the analytical solutions for x y and z.
+    //They were solved from the following three equations
+    //      Ax + By + Cz + D = 0
+    //      ( fx * x ) + ( z * delta_u ) = 0 
+    //      ( fy * y ) + ( z * delta_v ) = 0 
+
+    const float z = D / ( A*delta_u/fx + B*delta_v/fy - C );
+    const float x = - delta_u * z / fx;
+    const float y = - delta_v * z / fy;
+    
+    if ( doorPoints.size() < 4 ){
+        doorPoints.push_back( pcl::PointXYZ( x, y, z ) );
+        drawPoints.push_back( Eigen::Vector2i( u , v ) );
+    }else {
+       //replace the point that it is closest to, or 
+       int closestIndex = -1;
+       double minDistance = 1000000;
+
+       for ( int i = 0; i < 4; i ++ ){
+           int delta_u = drawPoints[i][0] - u ;
+           int delta_v = drawPoints[i][1] - v ;
+
+}
+
 //Planar segmentation function
 void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud, 
                              std::vector< LinePosArray > & linePositions,
@@ -138,7 +182,12 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
     
     //if the camera parameters have not been set, the program will not work, so abort
     assert( haveSetCamera );
-
+    
+    frame_index = 0;
+    planes.clear();
+    doorPoints.clear();
+    drawPoints.clear();
+   
     //initialize the model coefficients for the plane and 
     //send the cloud to the segmenter for segmentation
     pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
@@ -170,9 +219,16 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
         //THe coefficients are in Ax + By + Cz + D = 0 form. 
         seg.segment (*inliers, *coefficients);
 
+
         //If the size of the found plane is too small, exit the segmenter.
-        if ( inliers->indices.size () <= minPlaneSize ) { return; }
-        
+        if ( inliers->indices.size () <= minPlaneSize ) { 
+            return;
+        }
+
+
+        planes.resize( planes.size() + 1 );
+        planes.back().coeffs = *coefficients;
+
         //Find the lines in the plane and store them in the planarLines and
         //intensityLines vectors.
         LineArray planarLines;
@@ -194,7 +250,6 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
     //if the number of planes found is greater than or equal to the max number of 
     //planes, then quit
     while( linePositions.size() < maxPlaneNumber );
-
 
 }
 
@@ -377,9 +432,13 @@ inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
             }
         }
         viewer->showRGBImage( cdst.data, cdst.cols, cdst.rows );
+        //planes.back().image = cv::Mat::zeros( cloud->width, cloud->height , CV_8UC1 );
+        //copyIntensity.copyTo( planes.back().image, copyBinary ); 
+        copyIntensity.copyTo( planes.back().image, copyBinary );
+        cv::cvtColor( planes.back().image, planes.back().image, CV_GRAY2BGR );
 
-    }          
-}
+      }      
+   }
 
 
 //this solves for the position of all of the line endpoint in the

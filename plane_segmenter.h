@@ -19,6 +19,12 @@
 
 #include "SimpleConfig.h"
 
+struct plane_data {
+    pcl::ModelCoefficients coeffs;
+    cv::Mat image;
+};
+
+
 class PlaneSegmenter{
 
 
@@ -27,6 +33,16 @@ public:
     typedef pcl::PointCloud<Point> PointCloud;
     typedef std::vector< cv::Vec4i > LineArray;
     typedef std::vector< pcl::PointXYZ > LinePosArray;
+
+    std::vector<plane_data> planes;
+
+    int frame_index;
+    
+    bool waiting;
+
+    std::vector< pcl::PointXYZ > doorPoints;
+
+    std::vector< Eigen::Vector2i > drawPoints;
 
     PlaneSegmenter( const std::string & configFileName );
     PlaneSegmenter(int maxNumPlanes=6, int minSize=50000,
@@ -59,6 +75,8 @@ public:
                          int binaryUpperThreshold,
                          int intensitySize, int intensityLowerThreshold,
                          int intensityUpperThreshold );
+
+    void addDoorPoint(int u, int v);
 
 private:
 
@@ -136,6 +154,8 @@ private:
     inline void matrixLinesToPositions( const pcl::ModelCoefficients::Ptr & coeffs,
                                        const LineArray & lines, 
                                        LinePosArray & linePositions               );
+
+    inline void orderPoints();
 
 };
 
