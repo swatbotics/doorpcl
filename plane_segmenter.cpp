@@ -7,10 +7,6 @@ PlaneSegmenter::PlaneSegmenter( const std::string & configFileName ){
     double planeThreshold;
     int sacMethod;
     bool optimize;
-   
-    frame_index = 0;
-
-    waiting = true;
 
     //get plane segmentation parameters
     config.get("maxPlaneNumber", maxPlaneNumber);
@@ -53,8 +49,6 @@ PlaneSegmenter::PlaneSegmenter( const std::string & configFileName ){
     config.get( "filterSize", filterSize);
     config.get( "intensityErosionSize", intensityErosionSize);
     config.get( "lineDilationSize", lineDilationSize );
-
-
 
     haveSetCamera = false;
 }
@@ -134,58 +128,10 @@ void PlaneSegmenter::setFilterParams ( int blur, int filterSize,
     this->lineDilationSize = lineDilation;
 }
 
-void PlaneSegmenter::addDoorPoint ( int u, int v)
-{
-    //extract the coefficients of the plane
-    const float A = planes[ frame_index ].coeffs.values[0];
-    const float B = planes[ frame_index ].coeffs.values[1];
-    const float C = planes[ frame_index ].coeffs.values[2];
-    const float D = planes[ frame_index ].coeffs.values[3];
-
-    //this corrects for the inversion of the axes in
-    //the pcl image viewer point indexing.
-    //const int _u = u0 * 2 - u;
-    const int _v = v0 * 2 - v;
-
-    const float delta_u = u0 - u;
-    const float delta_v = v0 - _v;
-
-    //These are the analytical solutions for x y and z.
-    //They were solved from the following three equations
-    //      Ax + By + Cz + D = 0
-    //      ( fx * x ) + ( z * delta_u ) = 0 
-    //      ( fy * y ) + ( z * delta_v ) = 0 
-
-    const float z = D / ( A*delta_u/fx + B*delta_v/fy - C );
-    const float x = - delta_u * z / fx;
-    const float y = - delta_v * z / fy;
-    
-    if ( doorPoints.size() < 4 ){
-        doorPoints.push_back( pcl::PointXYZ( x, y, z ) );
-        drawPoints.push_back( Eigen::Vector2i( u , v ) );
-    }else {
-       //replace the point that it is closest to, or 
-       int closestIndex = -1;
-       int minDistance = 10000000000;
-
-       // TODO finish this: replace nearest neighbor
-       for ( int i = 0; i < 4; i ++ ){
-           const int delta_u = drawPoints[i][0] - u ;
-           const int delta_v = drawPoints[i][1] - v ;
-           const int dist2 = delta_u * delta_u + delta_v * delta_v;
-           if ( dist2 < minDistance ){
-               minDistance = dist2;
-               closestIndex = i;
-           }
-       }
-       doorPoints[ closestIndex ] = pcl::PointXYZ( x, y, z );
-       drawPoints[ closestIndex ] = Eigen::Vector2i( u, v );
-    }
-}
-
 
 //Planar segmentation function
-void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud, 
+void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
+                             std::vector< plane_data > & planes, 
                              std::vector< LinePosArray > & linePositions,
                              pcl::visualization::ImageViewer * viewer ) 
 {   
@@ -193,11 +139,6 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
     //if the camera parameters have not been set, the program will not work, so abort
     assert( haveSetCamera );
     
-    frame_index = 0;
-    planes.clear();
-    doorPoints.clear();
-    drawPoints.clear();
-   
     //initialize the model coefficients for the plane and 
     //send the cloud to the segmenter for segmentation
     pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
@@ -212,7 +153,6 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
     for ( int i = 0; i < outliers->size(); i ++ ){
         (*outliers)[i] = i;
     }
-
 
     //This do while loop is the main segmentation loop.
     //The loop quits once the max number of planes has been reached, or
@@ -243,7 +183,7 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
         //intensityLines vectors.
         LineArray planarLines;
         LineArray intensityLines;
-        findLines( inliers, cloud, planarLines, intensityLines, viewer );
+        findLines( inliers, cloud, planes, planarLines, intensityLines, viewer );
  
         //transforms the lines in the plane into lines in space.
         linePositions.resize( linePositions.size() + 1 );
@@ -330,6 +270,7 @@ inline void PlaneSegmenter::cloudToMatIntensity(const std::vector< int > &
 //Find depth and color lines from segmented plane
 inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
                                        const PointCloud::ConstPtr & cloud,
+                                       std::vector< plane_data > & planes, 
                                       LineArray & planarLines,
                                       LineArray & intensityLines,
                                       pcl::visualization::ImageViewer * viewer )

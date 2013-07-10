@@ -24,7 +24,6 @@ struct plane_data {
     cv::Mat image;
 };
 
-
 class PlaneSegmenter{
 
 
@@ -33,17 +32,7 @@ public:
     typedef pcl::PointCloud<Point> PointCloud;
     typedef std::vector< cv::Vec4i > LineArray;
     typedef std::vector< pcl::PointXYZ > LinePosArray;
-
-    std::vector<plane_data> planes;
-
-    int frame_index;
     
-    bool waiting;
-
-    std::vector< pcl::PointXYZ > doorPoints;
-
-    std::vector< Eigen::Vector2i > drawPoints;
-
     PlaneSegmenter( const std::string & configFileName );
     PlaneSegmenter(int maxNumPlanes=6, int minSize=50000,
                    bool optimize=false, float threshold=0.03, 
@@ -53,6 +42,7 @@ public:
     //if the user wants to display an image of the lines and planes in 2d, then
     //the user can input a pointer to an image viewer.
     void segment(const PointCloud::ConstPtr &cloud, 
+                 std::vector< plane_data > & planes, 
                  std::vector< LinePosArray > & linePositions,
                   pcl::visualization::ImageViewer * viewer=NULL  );
 
@@ -75,8 +65,6 @@ public:
                          int binaryUpperThreshold,
                          int intensitySize, int intensityLowerThreshold,
                          int intensityUpperThreshold );
-
-    void addDoorPoint(int u, int v);
 
 private:
 
@@ -137,6 +125,7 @@ private:
     //edge detection algorithm. Then a houghLine algorithm is run to extract lines
     inline void findLines(const pcl::PointIndices::Ptr & inliers,
                           const PointCloud::ConstPtr & cloud,
+                          std::vector< plane_data > & planes, 
                           LineArray & planarLines,
                           LineArray & intensityLines,
                           pcl::visualization::ImageViewer * viewer );
