@@ -357,15 +357,23 @@ class SimpleOpenNIViewer
 
     void drawLines ()
     {
-        removeAllDoorLines();
 
-        cout << "entering draw Lines with " << doorPoints.size()
-             << " points." << endl;
-        if ( doorPoints.size() < 2 ){
-            cout << "\texiting due to lack of points" << endl;
-            return;
+        removeAllDoorLines();
+        
+        for ( int i = 0; i < drawPoints.size() ; i ++ ){
+        
+            const pcl::visualization::Vector3ub red_color(255,0,0);
+            const pcl::visualization::Vector3ub blu_color(0,0,255);
+            const double radius = 10, opacity = 1.0;
+            const std::string shape_id = "points";
+        
+            plane_viewer->markPoint( drawPoints[i][0], drawPoints[i][1],
+                red_color, blu_color, radius, shape_id, opacity);
         }
 
+        if ( doorPoints.size() < 2 ){
+            return;
+        }
 
         assert(drawPoints.size() == doorPoints.size());
 
@@ -390,8 +398,7 @@ class SimpleOpenNIViewer
             
 
             plane_viewer->addLine(start2D[0], start2D[1], end2D[0], end2D[1],
-                            1.0, 0, 0,
-                            "doorLine" +  boost::to_string( i ) );
+                            1.0, 0, 0, "points");
             line_viewer->addLine(start3D, end3D,
                             255, 0, 0,
                             "doorLine" +  boost::to_string( i ),
@@ -401,11 +408,10 @@ class SimpleOpenNIViewer
     }
 
     void removeAllDoorLines(){
+        plane_viewer->removeLayer( "points" );
         for ( int i = 0; i < doorPoints.size() ; i ++ ){
             std::string id = "doorLine" + boost::to_string( i );
-            plane_viewer->removeLayer( id );
             line_viewer->removeShape( id ); 
-
         }
     }
 
@@ -504,13 +510,6 @@ void mouseClick(const pcl::visualization::MouseEvent &event,
     {    
 
         view->addDoorPoint( event.getX() , event.getY() );
-
-        pcl::visualization::Vector3ub red_color(255,0,0);
-        pcl::visualization::Vector3ub blu_color(0,0,255);
-        float radius = 10;
-        
-        view->plane_viewer->markPoint( event.getX(), event.getY(),
-        red_color, blu_color, radius);
 
         //cout << "Door Point: " << seg->doorPoints.back() << "\n";
         if (view->doorPoints.size() == 4)
