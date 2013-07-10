@@ -166,13 +166,23 @@ void PlaneSegmenter::addDoorPoint ( int u, int v)
     }else {
        //replace the point that it is closest to, or 
        int closestIndex = -1;
-       double minDistance = 1000000;
+       int minDistance = 10000000000;
 
+       // TODO finish this: replace nearest neighbor
        for ( int i = 0; i < 4; i ++ ){
-           int delta_u = drawPoints[i][0] - u ;
-           int delta_v = drawPoints[i][1] - v ;
-
+           const int delta_u = drawPoints[i][0] - u ;
+           const int delta_v = drawPoints[i][1] - v ;
+           const int dist2 = delta_u * delta_u + delta_v * delta_v;
+           if ( dist2 < minDistance ){
+               minDistance = dist2;
+               closestIndex = i;
+           }
+       }
+       doorPoints[ closestIndex ] = pcl::PointXYZ( x, y, z );
+       drawPoints[ closestIndex ] = Eigen::Vector2i( u, v );
+    }
 }
+
 
 //Planar segmentation function
 void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud, 

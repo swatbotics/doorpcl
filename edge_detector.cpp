@@ -15,77 +15,11 @@
 
 #include "SimpleConfig.h"
 
-unsigned int text_id = 0;
-
-
-//mouse click callback- currently prints out location of mouse click
-//on viewer
-//TODO: return plane that mouse click location is a member of
 void mouseClick(const pcl::visualization::MouseEvent &event,
-                    void* segmenter)
-{  
-    PlaneSegmenter * seg = ( PlaneSegmenter *) segmenter;
-     
-    if (event.getButton () == 
-        pcl::visualization::MouseEvent::RightButton)
-    {    
+                    void* viewer);
 
-        seg->addDoorPoint( event.getX() , event.getY() );
-        //cout << "Door Point: " << seg->doorPoints.back() << "\n";
-        if (seg->doorPoints.size() == 4)
-        {
-        }
-
-    }
-} 
-
-
-//keyboard event handler callback
 void keyboardEventOccurred (const pcl::visualization::KeyboardEvent
-                            &event, void* segmenter )
-{
-    PlaneSegmenter * seg = ( PlaneSegmenter *) segmenter;
-     
-    //show previous plane
-    if (event.getKeySym () == "a" && event.keyDown ())
-    {
-        //do things
-        seg->frame_index--;
-        if (seg->frame_index < 0)
-        {
-            seg->frame_index = seg->planes.size() - 1;
-        }
-        cout << "displaying previous frame" << endl;
-        
-    }
-
-    //show next plane
-    else if (event.getKeySym () == "d" && event.keyDown ())
-    {
-        //do different things
-        seg->frame_index++;
-        if (seg->frame_index >= seg->planes.size())
-        {
-            seg->frame_index = 0;
-        }
-        cout << "displaying next frame" << endl;
-    }
-
-    //pause and unpause
-    else if (event.getKeySym () == "p" && event.keyDown ())
-    {
-        if (seg->waiting)
-        {
-            seg->waiting = false;
-            cout << "resuming" << endl;
-        }
-        else
-        {
-            seg->waiting = true;
-            cout << "pausing" << endl;
-        }
-    }
-}
+                            &event, void* segmenter );
 
 
 class SimpleOpenNIViewer
@@ -109,6 +43,8 @@ class SimpleOpenNIViewer
     //pcl::visualization::CloudViewer * cloud_viewer;
     pcl::visualization::ImageViewer * image_viewer;
     pcl::visualization::ImageViewer * plane_viewer;
+
+    Eigen::Vector3f doorPosition, doorRotation;
 
     std::string filename;
 
@@ -234,7 +170,7 @@ class SimpleOpenNIViewer
           boost::bind (&SimpleOpenNIViewer::keyboardEventOccurred, this, _1);
         */
 
-        plane_viewer->registerMouseCallback(mouseClick, (void*)&segmenter);
+        plane_viewer->registerMouseCallback(mouseClick, (void*)this);
         plane_viewer->registerKeyboardCallback( keyboardEventOccurred,
                                                 (void*)&segmenter );
         viewerIsInitialized = true;
@@ -302,10 +238,57 @@ class SimpleOpenNIViewer
 
             plane_viewer->showRGBImage( matrix.data, matrix.cols, matrix.rows);
             plane_viewer->spinOnce();
-            drawLines();
         }
     }
 
+    void getDoorInfo(Eigen::Vector3f doorPos, Eigen::Vector3f doorRot )
+    {
+        Eigen::Vector3f p0 (segmenter.doorPoints[0].x,
+                            segmenter.doorPoints[0].y,
+                            segmenter.doorPoints[0].z);
+
+        Eigen::Vector3f p1 (segmenter.doorPoints[1].x,
+                            segmenter.doorPoints[1].y,
+                            segmenter.doorPoints[1].z);
+
+        Eigen::Vector3f p2 (segmenter.doorPoints[2].x,
+                            segmenter.doorPoints[2].y,
+                            segmenter.doorPoints[2].z);
+
+        Eigen::Vector3f p3 (segmenter.doorPoints[3].x,
+                            segmenter.doorPoints[3].y,
+                            segmenter.doorPoints[3].z);
+      
+      
+        //since most doors are taller than they are wide, we set the height
+        //of the door equal to the larger dimension and the width equal
+        //to the smaller one
+        Eigen::Vector3f up = ((p0 - p1) + (p3 - p2)) / 2;
+        Eigen::Vector3f across = ((p1 - p2) + (p0 - p3)) / 2;
+
+        float height = up.norm();
+        float width = across.norm();
+
+        if ( width > height )
+        {
+            std::swap(width, height);
+            std::swap(up, across);
+        }
+
+        cout << "width: " << width << "\theight: " << height << endl;
+
+        Eigen::Vector3f center = ((p0 + p1 + p2 + p3) / 4);
+        
+        doorPos[0] = center[0];
+        doorPos[1] = center[1];
+        doorPos[2] = center[2];
+        
+        /* 
+        doorRot[0];
+        doorRot[1];
+        doorRot[2];
+        */
+    }
 
     void drawLines ()
     {
@@ -442,6 +425,80 @@ class SimpleOpenNIViewer
 };
 
 
+//mouse click callback- currently prints out location of mouse click
+//on viewer
+//TODO: return plane that mouse click location is a member of
+void mouseClick(const pcl::visualization::MouseEvent &event,
+                    void* viewer)
+{  
+
+    SimpleOpenNIViewer * view = ( SimpleOpenNIViewer *) viewer;
+    PlaneSegmenter & seg = view->segmenter;
+     
+    if (event.getButton () == 
+        pcl::visualization::MouseEvent::RightButton)
+    {    
+
+        seg.addDoorPoint( event.getX() , event.getY() );
+        //cout << "Door Point: " << seg->doorPoints.back() << "\n";
+        if (seg.doorPoints.size() == 4)
+        {
+            view->getDoorInfo(view->doorPosition, view->doorRotation);
+        }
+        view->drawLines();
+    }
+} 
+
+
+//keyboard event handler callback
+void keyboardEventOccurred (const pcl::visualization::KeyboardEvent
+                            &event, void* viewer )
+{
+    SimpleOpenNIViewer * view = ( SimpleOpenNIViewer *) viewer;
+    PlaneSegmenter & seg = view->segmenter;
+
+    //show previous plane
+    if (event.getKeySym () == "a" && event.keyDown ())
+    {
+        //do things
+        seg.frame_index--;
+        if (seg.frame_index < 0)
+        {
+            seg.frame_index = seg.planes.size() - 1;
+        }
+        cout << "displaying previous frame" << endl;
+        
+    }
+
+    //show next plane
+    else if (event.getKeySym () == "d" && event.keyDown ())
+    {
+        //do different things
+        seg.frame_index++;
+        if (seg.frame_index >= seg.planes.size())
+        {
+            seg.frame_index = 0;
+        }
+        cout << "displaying next frame" << endl;
+    }
+
+    //pause and unpause
+    else if (event.getKeySym () == "p" && event.keyDown ())
+    {
+        if (seg.waiting)
+        {
+            seg.waiting = false;
+            cout << "resuming" << endl;
+        }
+        else
+        {
+            seg.waiting = true;
+            cout << "pausing" << endl;
+        }
+    }
+}
+
+
 void printUsage(){
     cout << "Usage: ./edge_detector <mode: [1, 3]> <filename>\n"
          << "This program can run with 0, 1, or 2 arguements\n"
@@ -509,3 +566,5 @@ int main (int argc, char * argv[])
   
   return 0;
 }
+
+
