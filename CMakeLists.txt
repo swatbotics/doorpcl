@@ -14,11 +14,11 @@ include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
-set(HDRS plane_segmenter.h  strutils.h SimpleConfig.h )
-set(SRCS plane_segmenter.cpp )
+set(HDRS plane_segmenter.h  strutils.h SimpleConfig.h edge_detector.h)
+set(SRCS plane_segmenter.cpp edge_detector.cpp )
 
 add_library( plane_segmenter ${HDRS} ${SRCS} )
-add_executable (edge_detector ${HDRS} edge_detector.cpp)
+add_executable (edge_detector ${HDRS} door_finder.cpp)
 
 set( LIBS plane_segmenter ${PCL_LIBRARIES} ${OPENCV_LDFLAGS} )
 target_link_libraries (edge_detector ${LIBS} )
