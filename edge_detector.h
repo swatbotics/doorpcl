@@ -43,6 +43,7 @@ public:
     const float pixel_size;
     bool viewerIsInitialized, doWrite;
     bool showImage;
+    double radius;
 
     float fx, fy, u0, v0;
     bool waiting;
@@ -75,13 +76,23 @@ public:
                      Eigen::Vector3f & doorRot );
 
     //add a u, v point to the set of points,
-    void addDoorPoint ( int u, int v);
+    int addDoorPoint ( int u, int v);
 
     //draw the lines that the segmenter found
     void drawLines ();
 
+    pcl::PointXYZ projectPoint( int u, int v, int p );
+
+    //if the points do not follow a counter clockwise ordering,
+    //reorder them so that they do.
+    void orderPoints();
+
+    int current_grasp_index;
+
+
 private:
     SimpleConfig config;
+
 
     //this holds a set of colors for visualization
     std::vector< cv::Vec3i > colors;
@@ -101,9 +112,6 @@ private:
     void initViewer( const PointCloud::ConstPtr & cloud );
     
 
-    //if the points do not follow a counter clockwise ordering,
-    //reorder them so that they do.
-    void orderPoints();
 
     //this implements a left of test, and switches any 
     //points that fail the left-of test.

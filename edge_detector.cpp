@@ -20,6 +20,10 @@ EdgeDetector::EdgeDetector( const std::string & configFile )
          
     frame_index = 0;
 
+    radius = 10;
+
+    current_grasp_index = -1;
+
     waiting = true;
 
     view1 = 0;
@@ -122,20 +126,21 @@ void EdgeDetector::initViewer( const PointCloud::ConstPtr & cloud )
 
     plane_viewer->registerMouseCallback(mouseClick, (void*)this);
     plane_viewer->registerKeyboardCallback( keyboardEventOccurred,
-                                            (void*)&segmenter );
+                                            (void*)this );
     viewerIsInitialized = true;
 
 }
 
-void EdgeDetector::addDoorPoint ( int u, int v)
+
+pcl::PointXYZ EdgeDetector::projectPoint( int u, int v, int p )
 {
+
     //extract the coefficients of the plane
-    const float A = planes[ frame_index ].coeffs.values[0];
-    const float B = planes[ frame_index ].coeffs.values[1];
-    const float C = planes[ frame_index ].coeffs.values[2];
-    const float D = planes[ frame_index ].coeffs.values[3];
+    const float & A = planes[ p ].coeffs.values[0];
+    const float & B = planes[ p ].coeffs.values[1];
+    const float & C = planes[ p ].coeffs.values[2];
+    const float & D = planes[ p ].coeffs.values[3];
     
-    cout << "A: " << A << "\tB: " << B << "\tFx: " << fx << endl;
     //this corrects for the inversion of the axes in
     //the pcl image viewer point indexing.
     //const int _u = u0 * 2 - u;
@@ -153,10 +158,20 @@ void EdgeDetector::addDoorPoint ( int u, int v)
     const float z = D / ( A*delta_u/fx + B*delta_v/fy - C );
     const float x = - delta_u * z / fx;
     const float y = - delta_v * z / fy;
-    
+
+    return pcl::PointXYZ( x, y, z );
+}
+
+int EdgeDetector::addDoorPoint ( int u, int v)
+{
+    pcl::PointXYZ point3D = projectPoint( u, v, frame_index );
+    int indexAdded;
+
     if ( doorPoints.size() < 4 ){
-        doorPoints.push_back( pcl::PointXYZ( x, y, z ) );
+        doorPoints.push_back( point3D );
         drawPoints.push_back( Eigen::Vector2i( u , v ) );
+        indexAdded = doorPoints.size() - 1;
+
     }else {
        //replace the point that it is closest to, or 
        int closestIndex = -1;
@@ -171,14 +186,14 @@ void EdgeDetector::addDoorPoint ( int u, int v)
                closestIndex = i;
            }
        }
-       doorPoints[ closestIndex ] = pcl::PointXYZ( x, y, z );
+       doorPoints[ closestIndex ] = point3D;
        drawPoints[ closestIndex ] = Eigen::Vector2i( u, v );
+
+       indexAdded = closestIndex;
     }
 
-    //if the points are out of order, switch their order
-    if (doorPoints.size() == 4 ){
-        orderPoints();
-    }
+
+    return indexAdded;
 }
 
 //this function uses a left of test to make sure that all of the
@@ -267,7 +282,7 @@ void EdgeDetector::waitAndDisplay ()
     }
 
     frame_index = 0;
-    while (waiting)
+    while (this->waiting)
     {
 
         const cv::Mat & matrix = 
@@ -278,6 +293,7 @@ void EdgeDetector::waitAndDisplay ()
     }
     doorPoints.clear();
     drawPoints.clear();
+    removeAllDoorLines();
 }
 
 
@@ -331,10 +347,14 @@ void EdgeDetector::getDoorInfo(double & height, double & width,
     //this is a roll, pitch, yaw vector of angles.
     cout << "The doorRot values are liable to be wrong, this needs"
         << " to be checked\n";
-         
-    doorRot[ 0 ] = atan2(  across[2],  across[1] );
-    doorRot[ 1 ] = atan2(      up[2],      up[0] );
-    doorRot[ 2 ] = atan2( through[1], through[0] );
+
+    doorRot[ 0 ] = atan2( through[2], through[1] ) + M_PI / 2;
+    doorRot[ 1 ] = atan2(  across[2],  across[0] );
+    doorRot[ 2 ] = atan2(      up[1],      up[0] ) - M_PI / 2;
+
+    cout << "Roll: " << doorRot[0] << "\tPitch: " << doorRot[1] << "\tYaw: "
+         << doorRot[2] << endl;
+
 
 }
 
@@ -346,12 +366,11 @@ void EdgeDetector::drawLines ()
     for ( int i = 0; i < drawPoints.size() ; i ++ ){
     
         const pcl::visualization::Vector3ub red_color(255,0,0);
-        const pcl::visualization::Vector3ub blu_color(0,0,255);
-        const double radius = 10, opacity = 1.0;
+        const double opacity = 1.0;
         const std::string shape_id = "points";
     
         plane_viewer->markPoint( drawPoints[i][0], drawPoints[i][1],
-            red_color, blu_color, radius, shape_id, opacity);
+            red_color, red_color, radius, shape_id, opacity);
     }
 
     if ( doorPoints.size() < 2 ){
@@ -405,7 +424,7 @@ void EdgeDetector::run()
     pcl::OpenNIGrabber* interface = new pcl::OpenNIGrabber();
     boost::function<
         void (const PointCloud::ConstPtr&)> f =
-        boost::bind (&SimpleOpenNIViewer::cloud_cb_, this, _1);
+        boost::bind (&EdgeDetector::cloud_cb_, this, _1);
     interface->registerCallback (f);
 
     fx = interface->getDevice()->getDepthFocalLength() / pixel_size;
@@ -485,24 +504,62 @@ void mouseClick(const pcl::visualization::MouseEvent &event,
 {  
 
     EdgeDetector * detect = ( EdgeDetector *) detector;
-     
+    int & index = detect->current_grasp_index;
+    
     if (event.getButton () == 
         pcl::visualization::MouseEvent::RightButton)
     {    
+        cout << "Right Button\n";
+        if (event.getType() == pcl::visualization::MouseEvent::MouseButtonPress )
+        {
+            if (index >= 0 ) {
+                index = -1;
+                cout << "Index reset\n";
+            } else {
 
-        detect->addDoorPoint( event.getX() , event.getY() );
+                const int radius2 = detect->radius * detect->radius;
+                for (int i = 0; i < detect->doorPoints.size(); i++ )
+                {
+                   const int delta_u = detect->drawPoints[i][0] - event.getX() ;
+                   const int delta_v = detect->drawPoints[i][1] - event.getY() ;
 
-        //cout << "Door Point: " << seg->doorPoints.back() << "\n";
+                   const int dist2 = delta_u * delta_u + delta_v * delta_v;
+                   if ( dist2 < radius2 ){
+                       cout << "Grabbing Point\n";
+                       index = i;
+                       break;
+                   }
+                }
+                if (index < 0 ){
+                    detect->addDoorPoint( event.getX() , event.getY() );
+                }
+            }
+        }         
         if (detect->doorPoints.size() == 4)
         {
+            //if the points are out of order, switch their order
+            detect->orderPoints();
+
             //TODO : this is just test code, eventually,
             //we will remove this.
             double height, width;
             Eigen::Vector3f doorPos, doorRot;
             detect->getDoorInfo(height, width, doorPos, doorRot);
         }
+
         detect->drawLines();
     }
+
+    if( index >= 0 ){
+        detect->drawPoints[ index ][0] = event.getX();
+        detect->drawPoints[ index ][1] = event.getY();
+        detect->doorPoints[ index ] = 
+                detect->projectPoint( event.getX(), event.getY(), 
+                                      detect->frame_index );
+        detect->drawLines();                
+    }
+
+
 } 
 
 
