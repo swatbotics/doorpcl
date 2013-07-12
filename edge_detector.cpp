@@ -132,6 +132,133 @@ void EdgeDetector::initViewer( const PointCloud::ConstPtr & cloud )
 }
 
 
+void EdgeDetector::run()
+{
+
+#ifndef __APPLE__ 
+    pcl::OpenNIGrabber* interface = new pcl::OpenNIGrabber();
+    boost::function<
+        void (const PointCloud::ConstPtr&)> f =
+        boost::bind (&EdgeDetector::cloud_cb_, this, _1);
+    interface->registerCallback (f);
+
+    fx = interface->getDevice()->getDepthFocalLength() / pixel_size;
+    fy = fx;
+
+
+    interface->start ();
+
+    while (!line_viewer->wasStopped())
+    {
+        boost::this_thread::sleep (boost::posix_time::seconds (1));
+    }
+
+    interface->stop();
+
+#endif
+}
+
+//point cloud callback function gets new pointcloud and runs segmentation
+//algorithm
+void EdgeDetector::cloud_cb_ (const PointCloud::ConstPtr &cloud)
+{
+
+    if ( !viewerIsInitialized ){
+        initViewer( cloud );
+    }
+
+    if ( !line_viewer->wasStopped() ){
+        planes.clear();
+        std::vector< LinePosArray > planarLines;
+        if ( doWrite ){
+            savePointCloud( *cloud );
+        } else {
+            
+            segmenter.segment( cloud, planes, planarLines, image_viewer );
+        }
+        updateViewer( cloud, planarLines );
+    }
+    waitAndDisplay();
+    cout << "ended Call back\n";
+}
+
+//this program will run until the reader throws an error about 
+//a non-existant file.
+void EdgeDetector::runWithInputFile()
+{
+    while ( true ){
+        if ( !line_viewer->wasStopped() ){
+            planes.clear();
+            std::vector< LinePosArray > planarLines;
+            PointCloud::Ptr cloud (new PointCloud );
+            readPointCloud( cloud );
+
+            if ( !viewerIsInitialized ){
+                initViewer( cloud );
+            }
+
+            segmenter.segment( cloud, planes, planarLines, image_viewer );
+            updateViewer( cloud, planarLines );
+        }  
+        waitAndDisplay();        
+    }
+
+}
+
+//aves pcd files from grabbed pointclouds
+void EdgeDetector::savePointCloud(const PointCloud & cloud)
+{
+    static int index = 0;
+
+    pcl::io::savePCDFileBinary(filename + 
+                               boost::to_string( index ) + ".pcd"
+                               , cloud);
+    index ++;
+    cout << "Saving point cloud number: " << index << "\n";
+}
+
+//reads existing pcd files
+void EdgeDetector::readPointCloud(PointCloud::Ptr & cloud)
+{
+    static int index = 0;
+    try {
+        if (pcl::io::loadPCDFile<Point> (filename + 
+                                         boost::to_string( index )
+                                         +".pcd", *cloud) == -1)
+        {
+            cerr << "Couldn't read file "+filename+
+                     boost::to_string( index ) +".pcd" << endl;
+            exit(-1);
+        }
+    }
+    catch (std::exception &e){
+        cout << "Error reading pcd file" << e.what() << endl;
+    }
+    index ++;
+}
+
+
+
+inline void EdgeDetector::convertColor( PointCloud::Ptr & cloud,
+                   cv::Mat & mat,
+                   pcl::PointIndices::Ptr inliers)
+{
+    cv::Mat newMat = mat.reshape( 1, mat.cols * mat.rows );
+    
+    for (int i = 0; i < inliers->indices.size(); i++)
+    {
+        uint8_t colorVal = newMat.at<uint8_t>( 
+                           inliers->indices[i] , 0 );
+
+        uint8_t r(255), g( 255 - colorVal ), b( 255 - colorVal );
+        uint32_t rgb = (static_cast<uint32_t>(r) << 16 |
+             static_cast<uint32_t>(g) << 8 | static_cast<uint32_t>(b));
+        cloud->points[i].rgb = *reinterpret_cast<float*>(&rgb);
+    }
+}
+
+
+
 pcl::PointXYZ EdgeDetector::projectPoint( int u, int v, int p )
 {
 
@@ -228,52 +355,6 @@ void EdgeDetector::left_of_switch( const int index1, const int index2, const int
 }
 
 
-//point cloud callback function gets new pointcloud and runs segmentation
-//algorithm
-void EdgeDetector::cloud_cb_ (const PointCloud::ConstPtr &cloud)
-{
-
-    if ( !viewerIsInitialized ){
-        initViewer( cloud );
-    }
-
-    if ( !line_viewer->wasStopped() ){
-        planes.clear();
-        std::vector< LinePosArray > planarLines;
-        if ( doWrite ){
-            savePointCloud( *cloud );
-        } else {
-            
-            segmenter.segment( cloud, planes, planarLines, image_viewer );
-        }
-        updateViewer( cloud, planarLines );
-    }
-    waitAndDisplay();
-    cout << "ended Call back\n";
-}
-
-//this program will run until the reader throws an error about 
-//a non-existant file.
-void EdgeDetector::runWithInputFile()
-{
-    while ( true ){
-        if ( !line_viewer->wasStopped() ){
-            planes.clear();
-            std::vector< LinePosArray > planarLines;
-            PointCloud::Ptr cloud (new PointCloud );
-            readPointCloud( cloud );
-
-            if ( !viewerIsInitialized ){
-                initViewer( cloud );
-            }
-
-            segmenter.segment( cloud, planes, planarLines, image_viewer );
-            updateViewer( cloud, planarLines );
-        }  
-        waitAndDisplay();        
-    }
-
-}
 
 void EdgeDetector::waitAndDisplay ()
 {
@@ -417,83 +498,6 @@ void EdgeDetector::removeAllDoorLines(){
     }
 }
 
-void EdgeDetector::run()
-{
-
-#ifndef __APPLE__ 
-    pcl::OpenNIGrabber* interface = new pcl::OpenNIGrabber();
-    boost::function<
-        void (const PointCloud::ConstPtr&)> f =
-        boost::bind (&EdgeDetector::cloud_cb_, this, _1);
-    interface->registerCallback (f);
-
-    fx = interface->getDevice()->getDepthFocalLength() / pixel_size;
-    fy = fx;
-
-
-    interface->start ();
-
-    while (!line_viewer->wasStopped())
-    {
-        boost::this_thread::sleep (boost::posix_time::seconds (1));
-    }
-
-    interface->stop();
-
-#endif
-}
-
-//aves pcd files from grabbed pointclouds
-void EdgeDetector::savePointCloud(const PointCloud & cloud)
-{
-    static int index = 0;
-
-    pcl::io::savePCDFileBinary(filename + 
-                               boost::to_string( index ) + ".pcd"
-                               , cloud);
-    index ++;
-    cout << "Saving point cloud number: " << index << "\n";
-}
-
-//reads existing pcd files
-void EdgeDetector::readPointCloud(PointCloud::Ptr & cloud)
-{
-    static int index = 0;
-    try {
-        if (pcl::io::loadPCDFile<Point> (filename + 
-                                         boost::to_string( index )
-                                         +".pcd", *cloud) == -1)
-        {
-            cerr << "Couldn't read file "+filename+
-                     boost::to_string( index ) +".pcd" << endl;
-            exit(-1);
-        }
-    }
-    catch (std::exception &e){
-        cout << "Error reading pcd file" << e.what() << endl;
-    }
-    index ++;
-}
-
-
-
-inline void EdgeDetector::convertColor( PointCloud::Ptr & cloud,
-                   cv::Mat & mat,
-                   pcl::PointIndices::Ptr inliers)
-{
-    cv::Mat newMat = mat.reshape( 1, mat.cols * mat.rows );
-    
-    for (int i = 0; i < inliers->indices.size(); i++)
-    {
-        uint8_t colorVal = newMat.at<uint8_t>( 
-                           inliers->indices[i] , 0 );
-
-        uint8_t r(255), g( 255 - colorVal ), b( 255 - colorVal );
-        uint32_t rgb = (static_cast<uint32_t>(r) << 16 |
-             static_cast<uint32_t>(g) << 8 | static_cast<uint32_t>(b));
-        cloud->points[i].rgb = *reinterpret_cast<float*>(&rgb);
-    }
-}
 
 
 //mouse click callback- currently prints out location of mouse click
