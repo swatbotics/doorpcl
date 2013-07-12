@@ -37,6 +37,15 @@ Notes:
         PlaneSegmenter that takes a string as input and this constructs the PlaneSegmenter
         with a config file.
 
+    EdgeDetector vs PlaneSegmenter:
+        The PlaneSegmenter is useful for a variety of tasks that need plane segementation 
+        and line detection in those planes ie: wall detection, ladder detection, stair
+        detection, ground detection, data compression (compresses point cloud into several
+        lines), 
+        The edgeDetector is not particularly for general use. It is meant to find doors
+        using the planeSegementer data. It is highly formatted for our data, and so not
+        all that useful to other teams.
+
 Future Releases:
     Turn these classes into stand-alone ros nodes.
 
