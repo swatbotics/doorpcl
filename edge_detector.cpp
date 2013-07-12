@@ -7,6 +7,7 @@
 #include <boost/thread/thread.hpp>
 
 
+//This takes in the name of a configuration file as the input.
 EdgeDetector::EdgeDetector( const std::string & configFile )
                       : deviceFocalLength( 530.551),
                         pixel_size( 1.075 ),
@@ -18,14 +19,20 @@ EdgeDetector::EdgeDetector( const std::string & configFile )
     //initialize the segmenter class
     segmenter = PlaneSegmenter( configFile );
          
+    //the index of the current plane that is being viewed.
     frame_index = 0;
 
+    //the radius of the tag points
     radius = 10;
 
+    //the current tag point that is being grasped.
+    //All negative numbers mean that a tag point is not being grasped.
     current_grasp_index = -1;
 
+    //The frame start
     waiting = true;
 
+    //Initialize the separate views for the camera.
     view1 = 0;
     view2 = 0;
     line_viewer = new pcl::visualization::PCLVisualizer( "Line Viewer" ) ;
@@ -55,6 +62,7 @@ void EdgeDetector::updateViewer( const PointCloud::ConstPtr &cloud,
                    const std::vector< LinePosArray > & planarLines )
 {
 
+    //
     line_viewer->removeAllShapes( view1);
     line_viewer->updatePointCloud( cloud, "cloud");
 
@@ -79,9 +87,6 @@ void EdgeDetector::updateViewer( const PointCloud::ConstPtr &cloud,
 
     }
 
-    //cloud_viewer->showCloud( cloud );
-    
-
     line_viewer->spinOnce (100);
     
 }
@@ -91,18 +96,26 @@ void EdgeDetector::updateViewer( const PointCloud::ConstPtr &cloud,
 //initialize point cloud viewer
 void EdgeDetector::initViewer( const PointCloud::ConstPtr & cloud )
 {
+
+    // set the intrinsics for the camera. This is necessary for 
+    // projecting the points into real space.
     u0 = cloud->width / 2;
     v0 = cloud->height / 2;
     
-    segmenter.setCameraIntrinsics( deviceFocalLength, deviceFocalLength,
-                                   u0, v0 );
     fx = deviceFocalLength;
     fy = deviceFocalLength;
+    segmenter.setCameraIntrinsics( fx, fy, u0, v0 );
+
+    //set up the color handler for the point cloud viewer. this will
+    //enable showing color
     ColorHandler rgb( cloud );  
      
+    //create the dual view ports for the viewer.
     line_viewer->createViewPort( 0.0 , 0.0, 0.5, 1.0, view1 );
     line_viewer->createViewPort( 0.5 , 0.0, 1.0, 1.0, view2 );
      
+    //Set up the cloud viewer;
+    //  set the bg colors, camera position, coordinate system, and the 
     line_viewer->addPointCloud<Point> ( cloud, rgb,  "cloud", view2);
     line_viewer->setPointCloudRenderingProperties 
        (pcl::visualization::PCL_VISUALIZER_POINT_SIZE,
@@ -112,18 +125,13 @@ void EdgeDetector::initViewer( const PointCloud::ConstPtr & cloud )
     line_viewer->addCoordinateSystem (0.1);
     line_viewer->setCameraPosition(0,0,-3.5, 0,-1, 0);
 
+    //set the size of the image viewers. 
     image_viewer->setPosition( 700, 10 );
     image_viewer->setSize( 640, 480 );
-    
     plane_viewer->setPosition( 60, 10 );
     plane_viewer->setSize( 640, 480 );
 
-    /*
-    boost::function<
-      void (const PointCloud::ConstPtr&)> keys =
-      boost::bind (&SimpleOpenNIViewer::keyboardEventOccurred, this, _1);
-    */
-
+    //set the callbacks for the gui.
     plane_viewer->registerMouseCallback(mouseClick, (void*)this);
     plane_viewer->registerKeyboardCallback( keyboardEventOccurred,
                                             (void*)this );
