@@ -34,7 +34,7 @@ EdgeDetector::EdgeDetector( const std::string & configFile )
     image_viewer = new pcl::visualization::ImageViewer( "Image Viewer" );
     plane_viewer = new pcl::visualization::ImageViewer( "Plane Viewer" );
 
-    filename = "../drexelFrames/sample";
+    config.get( "filename", filename );
 
     //array of colors we will use to draw edge lines
     colors.push_back( cv::Vec3i ( 0  , 255,   0 ));
