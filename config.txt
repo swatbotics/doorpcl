@@ -1,6 +1,6 @@
 #this is our config file
 
-filename = ../frames/sample
+filename = ../drexelFrames/sample
 
 #plane segmenter parameters
 maxPlaneNumber = 6
