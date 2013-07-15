@@ -62,15 +62,19 @@ void EdgeDetector::updateViewer( const PointCloud::ConstPtr &cloud,
                    const std::vector< LinePosArray > & planarLines )
 {
 
-    //
+    //remove the shapes so that they can be updated.
     line_viewer->removeAllShapes( view1);
+    //update the point cloud
     line_viewer->updatePointCloud( cloud, "cloud");
 
+    //print out the number of planes.
     cout << "Number of Planes: " << planes.size() << endl;
 
+    //Display all of the edge lines in the line_viewer.
     for( int i = 0; i < planarLines.size(); i ++ ){
         const LinePosArray lines = planarLines[i];
 
+        //The every two points constitute a lines (two endpoints)
         for ( int j = 0; j < lines.size() ; j += 2 ){
             const pcl::PointXYZ start = lines[ j ];
             const pcl::PointXYZ end   = lines[ j+1 ];
