@@ -44,9 +44,12 @@ public:
     bool viewerIsInitialized, doWrite;
     bool showImage;
     double radius;
+    pcl::
 
     float fx, fy, u0, v0;
     bool waiting;
+
+    Eigen::Vector2i handle0, handle1;
 
     //these hold information on the current plane 
     //segmented picture.
@@ -88,6 +91,9 @@ public:
     void orderPoints();
 
     int current_grasp_index;
+
+    void getHandlePoints( pcl::PointIndices & indices ){
+    
 
 
 private:

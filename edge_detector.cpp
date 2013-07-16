@@ -395,6 +395,48 @@ void EdgeDetector::waitAndDisplay ()
     removeAllDoorLines();
 }
 
+double distanceFromPlane( const pcl::PointXYZ & point, const pcl::ModelCoefficients::Ptr 
+                             & coeffs, ){
+
+    //extract the coefficients of the plane
+    const float & A = planes[ p ].coeffs.values[0];
+    const float & B = planes[ p ].coeffs.values[1];
+    const float & C = planes[ p ].coeffs.values[2];
+    const float & D = planes[ p ].coeffs.values[3];
+    
+    const float numer = A * point.x + B * point.y + C * point.z + D;
+    const float denom = sqrt( A*A + B*B + C*C );
+
+    const distance = numer / denom;
+
+    if ( distance < 0 ){ return -distance; }
+    return distance;
+}
+
+
+void EdgeDetector::getHandlePoints( pcl::PointIndices & indices ){
+
+
+    if (handle0[1] > handle1[1] ){ std::swap( handle0[1], handle1[1] ); }
+    if (handle0[0] > handle1[0] ){ std::swap( handle0[0], handle1[0] ); }
+    
+    for ( int i = handle0[0]; i <= handle1[0] ; i ++ ){
+        for ( int j = handle0[1] ; j <= handle1[1] ; j ++ ){
+            
+            //index through cloud 
+            //the below indexing is invalid
+            const pcl::PointXYZ & p = cloud( i, j );
+            const double distance = distanceFromPlane( p, coeffs );
+
+            //if the distance is far off the plane, then it is on 
+            if ( distance > minDistOffPlane && distance < maxDistOffPlane ){
+            
+                indices.push_back( cloud->width * i + j );
+            }
+        }
+    }
+}
+
 
 //the doorPos is the position of the center of the door,
 //the 
