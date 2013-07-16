@@ -330,9 +330,15 @@ int EdgeDetector::addDoorPoint ( int u, int v)
 
        indexAdded = closestIndex;
     }
-
-
     return indexAdded;
+}
+
+void EdgeDetector::addHandlePoint( int u, int v)
+{
+    //get points in box, use same method as door points to create a square
+    pcl::PointXYZ point3D = projectPoint( u, v, frame_index );
+
+    //
 }
 
 //this function uses a left of test to make sure that all of the
@@ -523,9 +529,9 @@ void mouseClick(const pcl::visualization::MouseEvent &event,
     int & index = detect->current_grasp_index;
     
     if (event.getButton () == 
-        pcl::visualization::MouseEvent::RightButton)
+        pcl::visualization::MouseEvent::LeftButton)
     {    
-        cout << "Right Button\n";
+        cout << "Left Button\n";
         if (event.getType() == pcl::visualization::MouseEvent::MouseButtonPress )
         {
             if (index >= 0 ) {
@@ -564,6 +570,24 @@ void mouseClick(const pcl::visualization::MouseEvent &event,
         }
 
         detect->drawLines();
+    }
+
+    else if (event.getButton () == 
+        pcl::visualization::MouseEvent::RightButton)
+    {
+        /*  Here we want to manually set a door handle by right clicking.
+         *  The door handle will not be within the door plane, so we want to
+         *  change our segmentation algorithm and have our door handle belong
+         *  to a different plane.
+         *  Method: pick four points to form a bounding square around the
+         *  handle. For each point in the entire point cloud that exists
+         *  within this square, check to see whether it lies within the door
+         *  plane. If not, add it to a Handle object which contains points
+         *  that are a part of the handle.
+         */
+        
+        cout << "Right Button" << endl;
+        detect->addHandle( event.getX() , event.getY() ); 
     }
 
     if( index >= 0 ){
