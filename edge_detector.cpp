@@ -25,6 +25,16 @@ EdgeDetector::EdgeDetector( const std::string & configFile )
     //the radius of the tag points
     radius = 10;
 
+    //initalize the handle points
+    handle0[0] = -1;
+    handle0[1] = -1;
+    handle1[0] = -1;
+    handle1[1] = -1;
+
+    minDistOffPlane = 0.03;
+    maxDistOffPlane = 0.2;
+
+    handlePoints = pcl::IndicesPtr( new std::vector<int> );
     //the current tag point that is being grasped.
     //All negative numbers mean that a tag point is not being grasped.
     current_grasp_index = -1;
@@ -90,7 +100,19 @@ void EdgeDetector::updateViewer( const PointCloud::ConstPtr &cloud,
         }
 
     }
+    
+    cout << "handlePoints Size: " << handlePoints->size() << endl;
+    for ( int i = 0; i < 20 && i < handlePoints->size(); i ++ ){
+        const int a = rand() % handlePoints->size();
+        const int b = rand() % handlePoints->size();
+        const Point & p0 = curr_cloud->points[ handlePoints->at(a) ];
+        const Point & p1 = curr_cloud->points[ handlePoints->at(b) ];
 
+        line_viewer->addLine(p0, p1, 255, 255, 0,
+                            "handle" +  boost::to_string( i ),
+                             view1 );
+        cout << "added handle lines" << endl;
+    }
     line_viewer->spinOnce (100);
     
 }
@@ -174,7 +196,7 @@ void EdgeDetector::run()
 //algorithm
 void EdgeDetector::cloud_cb_ (const PointCloud::ConstPtr &cloud)
 {
-
+    curr_cloud = cloud;
     if ( !viewerIsInitialized ){
         initViewer( cloud );
     }
@@ -204,6 +226,7 @@ void EdgeDetector::runWithInputFile()
             std::vector< LinePosArray > planarLines;
             PointCloud::Ptr cloud (new PointCloud );
             readPointCloud( cloud );
+            curr_cloud = cloud;
 
             if ( !viewerIsInitialized ){
                 initViewer( cloud );
@@ -333,14 +356,6 @@ int EdgeDetector::addDoorPoint ( int u, int v)
     return indexAdded;
 }
 
-void EdgeDetector::addHandlePoint( int u, int v)
-{
-    //get points in box, use same method as door points to create a square
-    pcl::PointXYZ point3D = projectPoint( u, v, frame_index );
-
-    //
-}
-
 //this function uses a left of test to make sure that all of the
 //points are in the correct order.
 void EdgeDetector::orderPoints()
@@ -395,46 +410,51 @@ void EdgeDetector::waitAndDisplay ()
     removeAllDoorLines();
 }
 
-double distanceFromPlane( const pcl::PointXYZ & point, const pcl::ModelCoefficients::Ptr 
-                             & coeffs, ){
+double EdgeDetector::distanceFromPlane( const pcl::PointXYZRGBA & point,
+                                        const pcl::ModelCoefficients 
+                                        & coeffs ){
 
     //extract the coefficients of the plane
-    const float & A = planes[ p ].coeffs.values[0];
-    const float & B = planes[ p ].coeffs.values[1];
-    const float & C = planes[ p ].coeffs.values[2];
-    const float & D = planes[ p ].coeffs.values[3];
+    const float & A = planes[ frame_index ].coeffs.values[0];
+    const float & B = planes[ frame_index ].coeffs.values[1];
+    const float & C = planes[ frame_index ].coeffs.values[2];
+    const float & D = planes[ frame_index ].coeffs.values[3];
     
     const float numer = A * point.x + B * point.y + C * point.z + D;
     const float denom = sqrt( A*A + B*B + C*C );
 
-    const distance = numer / denom;
+    const float distance = numer / denom;
 
-    if ( distance < 0 ){ return -distance; }
+    if ( distance < 0 )
+    {
+        return -distance;
+    }
     return distance;
 }
 
 
-void EdgeDetector::getHandlePoints( pcl::PointIndices & indices ){
-
-
+void EdgeDetector::getHandlePoints( pcl::IndicesPtr & indices )
+{
+    cout << "getting handle points\n";
     if (handle0[1] > handle1[1] ){ std::swap( handle0[1], handle1[1] ); }
     if (handle0[0] > handle1[0] ){ std::swap( handle0[0], handle1[0] ); }
-    
+    cout << "finished swapping" << endl; 
     for ( int i = handle0[0]; i <= handle1[0] ; i ++ ){
         for ( int j = handle0[1] ; j <= handle1[1] ; j ++ ){
-            
             //index through cloud 
             //the below indexing is invalid
-            const pcl::PointXYZ & p = cloud( i, j );
-            const double distance = distanceFromPlane( p, coeffs );
+            const pcl::PointXYZRGBA & p = curr_cloud->at( i, j );
+            const double distance = distanceFromPlane( p,
+                                                 planes[frame_index].coeffs );
 
             //if the distance is far off the plane, then it is on 
-            if ( distance > minDistOffPlane && distance < maxDistOffPlane ){
-            
-                indices.push_back( cloud->width * i + j );
+            if ( distance > minDistOffPlane && distance < maxDistOffPlane )
+            {
+                indices->push_back( curr_cloud->width * i + j );
             }
         }
     }
+    cout << "size of handlePoints: " << indices->size() << endl;
 }
 
 
@@ -621,7 +641,7 @@ void mouseClick(const pcl::visualization::MouseEvent &event,
          *  The door handle will not be within the door plane, so we want to
          *  change our segmentation algorithm and have our door handle belong
          *  to a different plane.
-         *  Method: pick four points to form a bounding square around the
+         *  Method: pick two points to form a bounding rectangle around the
          *  handle. For each point in the entire point cloud that exists
          *  within this square, check to see whether it lies within the door
          *  plane. If not, add it to a Handle object which contains points
@@ -629,7 +649,21 @@ void mouseClick(const pcl::visualization::MouseEvent &event,
          */
         
         cout << "Right Button" << endl;
-        detect->addHandle( event.getX() , event.getY() ); 
+
+        if (detect->handle0[0] == -1 || detect->handle0[1] == -1)
+        {
+            cout << "getting first handle point\n";
+            detect->handle0[0] = event.getX();
+            detect->handle0[1] = event.getY();
+        }
+
+        else if (detect->handle1[0] == -1 || detect->handle1[1] == -1)
+        {
+            cout << "getting second handle point\n";
+            detect->handle1[0] = event.getX();
+            detect->handle1[1] = event.getY();
+            detect->getHandlePoints( detect->handlePoints );
+        }
     }
 
     if( index >= 0 ){

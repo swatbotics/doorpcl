@@ -43,8 +43,7 @@ public:
     const float pixel_size;
     bool viewerIsInitialized, doWrite;
     bool showImage;
-    double radius;
-    pcl::
+    double radius, minDistOffPlane, maxDistOffPlane;
 
     float fx, fy, u0, v0;
     bool waiting;
@@ -53,11 +52,14 @@ public:
 
     //these hold information on the current plane 
     //segmented picture.
+    PointCloud::ConstPtr curr_cloud;
     std::vector<plane_data> planes;
+
     int frame_index;    //the index of the plane currently
                         //being viewed
     //the xyz points of the corners of the doors in 3D space
     std::vector< pcl::PointXYZ > doorPoints;
+    pcl::IndicesPtr handlePoints;
     //the u, v points of the corners of the doors in 
     //the picture plane
     std::vector< Eigen::Vector2i > drawPoints;
@@ -92,7 +94,9 @@ public:
 
     int current_grasp_index;
 
-    void getHandlePoints( pcl::PointIndices & indices ){
+    void getHandlePoints( pcl::IndicesPtr & indices );
+    double distanceFromPlane( const pcl::PointXYZRGBA & point,
+                              const pcl::ModelCoefficients & coeffs);
     
 
 
