@@ -1,4 +1,10 @@
 #include "edge_detector.h"
+#include <pcl/sample_consensus/sac_model_cylinder.h>
+#include <pcl/features/normal_3d.h>
+#include <pcl/sample_consensus/method_types.h>
+#include <pcl/sample_consensus/model_types.h>
+#include <pcl/segmentation/sac_segmentation.h>
+#include <pcl/ModelCoefficients.h>
 
 #include <iostream>
 
@@ -15,6 +21,9 @@ EdgeDetector::EdgeDetector( const std::string & configFile )
                         doWrite( false ), showImage( false ),
                         u0( -1), v0(-1), config( configFile )
 {
+    //get the handle parameters
+    config.get( "minDistOffPlane", minDistOffPlane );
+    config.get( "maxDistOffPlane", maxDistOffPlane );
 
     //initialize the segmenter class
     segmenter = PlaneSegmenter( configFile );
@@ -25,16 +34,12 @@ EdgeDetector::EdgeDetector( const std::string & configFile )
     //the radius of the tag points
     radius = 10;
 
-    //initalize the handle points
+    //initalize the handle bounding points
     handle0[0] = -1;
     handle0[1] = -1;
     handle1[0] = -1;
     handle1[1] = -1;
-
-    minDistOffPlane = 0.03;
-    maxDistOffPlane = 0.2;
-
-    handlePoints = pcl::IndicesPtr( new std::vector<int> );
+    
     //the current tag point that is being grasped.
     //All negative numbers mean that a tag point is not being grasped.
     current_grasp_index = -1;
@@ -48,6 +53,8 @@ EdgeDetector::EdgeDetector( const std::string & configFile )
     line_viewer = new pcl::visualization::PCLVisualizer( "Line Viewer" ) ;
     line_viewer->initCameraParameters();
     
+    handleIndices = pcl::IndicesPtr ( new std::vector< int > );
+
     image_viewer = new pcl::visualization::ImageViewer( "Image Viewer" );
     plane_viewer = new pcl::visualization::ImageViewer( "Plane Viewer" );
 
@@ -209,12 +216,14 @@ double EdgeDetector::distanceFromPlane( const pcl::PointXYZRGBA & point,
 }
 
 
-void EdgeDetector::getHandlePoints( pcl::IndicesPtr & indices )
+void EdgeDetector::getHandlePoints( )
 {
     cout << "getting handle points\n";
     if (handle0[1] > handle1[1] ){ std::swap( handle0[1], handle1[1] ); }
     if (handle0[0] > handle1[0] ){ std::swap( handle0[0], handle1[0] ); }
-    cout << "finished swapping" << endl; 
+    
+    cout << "Assumed cloud size: " << curr_cloud->width * curr_cloud->height;
+    cout << "Cloud Size: " << curr_cloud->points.size() << "\n";
     for ( int i = handle0[0]; i <= handle1[0] ; i ++ ){
         for ( int j = handle0[1] ; j <= handle1[1] ; j ++ ){
             //index through cloud 
@@ -226,11 +235,34 @@ void EdgeDetector::getHandlePoints( pcl::IndicesPtr & indices )
             //if the distance is far off the plane, then it is on 
             if ( distance > minDistOffPlane && distance < maxDistOffPlane )
             {
-                indices->push_back( curr_cloud->width * i + j );
+                handleIndices->push_back( j * curr_cloud->width + i );
             }
         }
     }
-    cout << "size of handlePoints: " << indices->size() << endl;
+    if (handleIndices->size() > 0 ){
+        pcl::PointIndices inliers;
+        
+        pcl::SACSegmentation<Point> sac_seg;
+        sac_seg.setOptimizeCoefficients( true );
+        sac_seg.setInputCloud( curr_cloud->makeShared() );
+        sac_seg.setIndices( handleIndices );
+        sac_seg.setModelType( pcl::SACMODEL_LINE );
+        sac_seg.setMethodType( pcl::SAC_RANSAC );
+        sac_seg.setRadiusLimits( 0, 0.03 );
+        sac_seg.setDistanceThreshold( 0.5 );
+        sac_seg.segment( inliers, handleCoeffs );
+        //sac_seg.segment( , handleCoeffs );
+        
+        handlePos[0] = handleCoeffs.values[0];
+        handlePos[1] = handleCoeffs.values[1];
+        handlePos[2] = handleCoeffs.values[2];
+        
+        handleAxis[0] = handleCoeffs.values[3];
+        handleAxis[1] = handleCoeffs.values[4];
+        handleAxis[2] = handleCoeffs.values[5];
+    }
+
+    drawHandle();
 }
 
 
@@ -295,15 +327,15 @@ void EdgeDetector::getDoorInfo(double & height, double & width,
 
 }
 
-void getHandleInfo( double & length, double & height,
+void EdgeDetector::getHandleInfo( double & length, double & height,
                     Eigen::Vector3f & center ){
 
-    Eigen::Vector3f lowerBounds, upperbounds;
+    Eigen::Vector3f lowerBounds, upperBounds;
 
-    for ( int i = 0; i < handlePoints->size(); i ++ ){
+    for ( int i = 0; i < handleIndices->size(); i ++ ){
 
         //get the point on the doorknob
-        const int index = handlePoints->at( i );
+        const int index = handleIndices->at( i );
         const Point & currentPoint = curr_cloud->points[ index ];
 
         if ( currentPoint.x > upperBounds[0] ){ upperBounds[0] = currentPoint.x; }
@@ -415,25 +447,31 @@ void EdgeDetector::updateViewer( const PointCloud::ConstPtr &cloud,
                             "line" +  boost::to_string( j*100 +i ),
                              view1 );
         }
-
     }
-    
-    cout << "handlePoints Size: " << handlePoints->size() << endl;
-    for ( int i = 0; i < 20 && i < handlePoints->size(); i ++ ){
-        const int a = rand() % handlePoints->size();
-        const int b = rand() % handlePoints->size();
-        const Point & p0 = curr_cloud->points[ handlePoints->at(a) ];
-        const Point & p1 = curr_cloud->points[ handlePoints->at(b) ];
-
-        line_viewer->addLine(p0, p1, 255, 255, 0,
-                            "handle" +  boost::to_string( i ),
-                             view1 );
-        cout << "added handle lines" << endl;
-    }
-    line_viewer->spinOnce (100);
-    
 }
 
+void EdgeDetector::drawHandle(){
+
+    cout << "handlePoints Size: " << handleIndices->size() << endl;
+    for ( int i = 0; i < 40 && i < handleIndices->size(); i ++ ){
+        const int a = rand() % handleIndices->size();
+        const int b = rand() % handleIndices->size();
+
+        const Point & p0 = curr_cloud->points[ handleIndices->at( a ) ];
+        const Point & p1 = curr_cloud->points[ handleIndices->at( b ) ];
+        
+        line_viewer->addLine(p0, p1, 0, 0, 255,
+                            "handleSecond" +  boost::to_string( i ),
+                             view1 );
+
+
+        cout << "added handle lines" << endl;
+    
+    }
+    line_viewer->addLine( handleCoeffs, "handle", view1 );
+
+    line_viewer->spinOnce (100);
+}
 
 
 //initialize point cloud viewer
@@ -685,15 +723,15 @@ void mouseClick(const pcl::visualization::MouseEvent &event,
         {
             cout << "getting first handle point\n";
             detect->handle0[0] = event.getX();
-            detect->handle0[1] = event.getY();
+            detect->handle0[1] = detect->v0 * 2 - event.getY();
         }
 
         else if (detect->handle1[0] == -1 || detect->handle1[1] == -1)
         {
             cout << "getting second handle point\n";
             detect->handle1[0] = event.getX();
-            detect->handle1[1] = event.getY();
-            detect->getHandlePoints( detect->handlePoints );
+            detect->handle1[1] = detect->v0 * 2 - event.getY();
+            detect->getHandlePoints( );
         }
     }
 

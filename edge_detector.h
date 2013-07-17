@@ -49,7 +49,10 @@ public:
     bool waiting;
 
     int current_grasp_index;
-    
+
+    Eigen::Vector3f handlePos;
+    Eigen::Vector3f handleAxis;
+    double handleRadius;
 
     Eigen::Vector2i handle0, handle1;
 
@@ -62,7 +65,10 @@ public:
                         //being viewed
     //the xyz points of the corners of the doors in 3D space
     std::vector< pcl::PointXYZ > doorPoints;
-    pcl::IndicesPtr handlePoints;
+    pcl::IndicesPtr handleIndices;
+
+    pcl::ModelCoefficients handleCoeffs;
+
     //the u, v points of the corners of the doors in 
     //the picture plane
     std::vector< Eigen::Vector2i > drawPoints;
@@ -96,7 +102,7 @@ public:
 
     //draw the lines that the segmenter found
     void drawLines ();
-
+    void drawHandle();
     pcl::PointXYZ projectPoint( int u, int v, int p );
 
     //if the points do not follow a counter clockwise ordering,
@@ -104,7 +110,7 @@ public:
     void orderPoints();
 
 
-    void getHandlePoints( pcl::IndicesPtr & indices );
+    void getHandlePoints();
     double distanceFromPlane( const pcl::PointXYZRGBA & point,
                               const pcl::ModelCoefficients & coeffs);
     

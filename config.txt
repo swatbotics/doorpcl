@@ -5,7 +5,7 @@ filename = ../frames/sample
 #plane segmenter parameters
 maxPlaneNumber = 6
 minPlaneSize = 50000
-optimize = false
+optimize = true
 planeThreshold = 0.06
 sacMethod = 0
    #different sac segmentation types
@@ -44,3 +44,7 @@ cannyBinaryHighThreshold = 200
 cannyIntensitySize = 3
 cannyIntensityLowThreshold = 50
 cannyIntensityHighThreshold = 100
+
+#handle parameters
+minDistOffPlane = 0.03
+maxDistOffPlane = 0.1
