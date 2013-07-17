@@ -67,230 +67,6 @@ EdgeDetector::EdgeDetector( const std::string & configFile )
 
 
 
-//create a viewer that holds lines and a point cloud.
-void EdgeDetector::updateViewer( const PointCloud::ConstPtr &cloud,
-                   const std::vector< LinePosArray > & planarLines )
-{
-
-    //remove the shapes so that they can be updated.
-    line_viewer->removeAllShapes( view1);
-    //update the point cloud
-    line_viewer->updatePointCloud( cloud, "cloud");
-
-    //print out the number of planes.
-    cout << "Number of Planes: " << planes.size() << endl;
-
-    //Display all of the edge lines in the line_viewer.
-    for( int i = 0; i < planarLines.size(); i ++ ){
-        const LinePosArray lines = planarLines[i];
-
-        //The every two points constitute a lines (two endpoints)
-        for ( int j = 0; j < lines.size() ; j += 2 ){
-            const pcl::PointXYZ start = lines[ j ];
-            const pcl::PointXYZ end   = lines[ j+1 ];
-            
-            cv::Vec3i color = colors[ (i / 2) % colors.size() ];
-            if ( i % 2 == 1 ){
-                color *= 0.2;
-            }
-            line_viewer->addLine(start, end,
-                            color[0], color[1], color[2],
-                            "line" +  boost::to_string( j*100 +i ),
-                             view1 );
-        }
-
-    }
-    
-    cout << "handlePoints Size: " << handlePoints->size() << endl;
-    for ( int i = 0; i < 20 && i < handlePoints->size(); i ++ ){
-        const int a = rand() % handlePoints->size();
-        const int b = rand() % handlePoints->size();
-        const Point & p0 = curr_cloud->points[ handlePoints->at(a) ];
-        const Point & p1 = curr_cloud->points[ handlePoints->at(b) ];
-
-        line_viewer->addLine(p0, p1, 255, 255, 0,
-                            "handle" +  boost::to_string( i ),
-                             view1 );
-        cout << "added handle lines" << endl;
-    }
-    line_viewer->spinOnce (100);
-    
-}
-
-
-
-//initialize point cloud viewer
-void EdgeDetector::initViewer( const PointCloud::ConstPtr & cloud )
-{
-
-    // set the intrinsics for the camera. This is necessary for 
-    // projecting the points into real space.
-    u0 = cloud->width / 2;
-    v0 = cloud->height / 2;
-    
-    fx = deviceFocalLength;
-    fy = deviceFocalLength;
-    segmenter.setCameraIntrinsics( fx, fy, u0, v0 );
-
-    //set up the color handler for the point cloud viewer. this will
-    //enable showing color
-    ColorHandler rgb( cloud );  
-     
-    //create the dual view ports for the viewer.
-    line_viewer->createViewPort( 0.0 , 0.0, 0.5, 1.0, view1 );
-    line_viewer->createViewPort( 0.5 , 0.0, 1.0, 1.0, view2 );
-     
-    //Set up the cloud viewer;
-    //  set the bg colors, camera position, coordinate system, and the 
-    line_viewer->addPointCloud<Point> ( cloud, rgb,  "cloud", view2);
-    line_viewer->setPointCloudRenderingProperties 
-       (pcl::visualization::PCL_VISUALIZER_POINT_SIZE,
-        1, "cloud", view2);
-    line_viewer->setBackgroundColor( 0, 0, 0, view2 );
-    line_viewer->setBackgroundColor( 0.1, 0.1, 0.1 , view1 );
-    line_viewer->addCoordinateSystem (0.1);
-    line_viewer->setCameraPosition(0,0,-3.5, 0,-1, 0);
-
-    //set the size of the image viewers. 
-    image_viewer->setPosition( 700, 10 );
-    image_viewer->setSize( 640, 480 );
-    plane_viewer->setPosition( 60, 10 );
-    plane_viewer->setSize( 640, 480 );
-
-    //set the callbacks for the gui.
-    plane_viewer->registerMouseCallback(mouseClick, (void*)this);
-    plane_viewer->registerKeyboardCallback( keyboardEventOccurred,
-                                            (void*)this );
-    viewerIsInitialized = true;
-
-}
-
-
-void EdgeDetector::run()
-{
-
-#ifndef __APPLE__ 
-    pcl::OpenNIGrabber* interface = new pcl::OpenNIGrabber();
-    boost::function<
-        void (const PointCloud::ConstPtr&)> f =
-        boost::bind (&EdgeDetector::cloud_cb_, this, _1);
-    interface->registerCallback (f);
-
-    fx = interface->getDevice()->getDepthFocalLength() / pixel_size;
-    fy = fx;
-
-
-    interface->start ();
-
-    while (!line_viewer->wasStopped())
-    {
-        boost::this_thread::sleep (boost::posix_time::seconds (1));
-    }
-
-    interface->stop();
-
-#endif
-}
-
-//point cloud callback function gets new pointcloud and runs segmentation
-//algorithm
-void EdgeDetector::cloud_cb_ (const PointCloud::ConstPtr &cloud)
-{
-    curr_cloud = cloud;
-    if ( !viewerIsInitialized ){
-        initViewer( cloud );
-    }
-
-    if ( !line_viewer->wasStopped() ){
-        planes.clear();
-        std::vector< LinePosArray > planarLines;
-        if ( doWrite ){
-            savePointCloud( *cloud );
-        } else {
-            
-            segmenter.segment( cloud, planes, planarLines, image_viewer );
-        }
-        updateViewer( cloud, planarLines );
-    }
-    waitAndDisplay();
-    cout << "ended Call back\n";
-}
-
-//this program will run until the reader throws an error about 
-//a non-existant file.
-void EdgeDetector::runWithInputFile()
-{
-    while ( true ){
-        if ( !line_viewer->wasStopped() ){
-            planes.clear();
-            std::vector< LinePosArray > planarLines;
-            PointCloud::Ptr cloud (new PointCloud );
-            readPointCloud( cloud );
-            curr_cloud = cloud;
-
-            if ( !viewerIsInitialized ){
-                initViewer( cloud );
-            }
-
-            segmenter.segment( cloud, planes, planarLines, image_viewer );
-            updateViewer( cloud, planarLines );
-        }  
-        waitAndDisplay();        
-    }
-
-}
-
-//aves pcd files from grabbed pointclouds
-void EdgeDetector::savePointCloud(const PointCloud & cloud)
-{
-    static int index = 0;
-
-    pcl::io::savePCDFileBinary(filename + 
-                               boost::to_string( index ) + ".pcd"
-                               , cloud);
-    index ++;
-    cout << "Saving point cloud number: " << index << "\n";
-}
-
-//reads existing pcd files
-void EdgeDetector::readPointCloud(PointCloud::Ptr & cloud)
-{
-    static int index = 0;
-    try {
-        if (pcl::io::loadPCDFile<Point> (filename + 
-                                         boost::to_string( index )
-                                         +".pcd", *cloud) == -1)
-        {
-            cerr << "Couldn't read file "+filename+
-                     boost::to_string( index ) +".pcd" << endl;
-            exit(-1);
-        }
-    }
-    catch (std::exception &e){
-        cout << "Error reading pcd file" << e.what() << endl;
-    }
-    index ++;
-}
-
-
-
-inline void EdgeDetector::convertColor( PointCloud::Ptr & cloud,
-                   cv::Mat & mat,
-                   pcl::PointIndices::Ptr inliers)
-{
-    cv::Mat newMat = mat.reshape( 1, mat.cols * mat.rows );
-    
-    for (int i = 0; i < inliers->indices.size(); i++)
-    {
-        uint8_t colorVal = newMat.at<uint8_t>( 
-                           inliers->indices[i] , 0 );
-
-        uint8_t r(255), g( 255 - colorVal ), b( 255 - colorVal );
-        uint32_t rgb = (static_cast<uint32_t>(r) << 16 |
-             static_cast<uint32_t>(g) << 8 | static_cast<uint32_t>(b));
-        cloud->points[i].rgb = *reinterpret_cast<float*>(&rgb);
-    }
-}
 
 
 
@@ -519,6 +295,37 @@ void EdgeDetector::getDoorInfo(double & height, double & width,
 
 }
 
+void getHandleInfo( double & length, double & height,
+                    Eigen::Vector3f & center ){
+
+    Eigen::Vector3f lowerBounds, upperbounds;
+
+    for ( int i = 0; i < handlePoints->size(); i ++ ){
+
+        //get the point on the doorknob
+        const int index = handlePoints->at( i );
+        const Point & currentPoint = curr_cloud->points[ index ];
+
+        if ( currentPoint.x > upperBounds[0] ){ upperBounds[0] = currentPoint.x; }
+        if ( currentPoint.y > upperBounds[1] ){ upperBounds[1] = currentPoint.y; }
+        if ( currentPoint.z > upperBounds[2] ){ upperBounds[2] = currentPoint.z; }
+        
+        if ( currentPoint.x < lowerBounds[0] ){ lowerBounds[0] = currentPoint.x; }
+        if ( currentPoint.y < lowerBounds[1] ){ lowerBounds[1] = currentPoint.y; }
+        if ( currentPoint.z < lowerBounds[2] ){ lowerBounds[2] = currentPoint.z; }
+
+    }
+
+    center = (upperBounds + lowerBounds) / 2;
+
+    const int heightIndex = 1;
+    height = upperBounds[ heightIndex ] - lowerBounds[ heightIndex ];
+
+    const int lengthIndex = 0;
+    length = upperBounds[ lengthIndex ] - lowerBounds[ lengthIndex ];
+
+}
+
 void EdgeDetector::drawLines ()
 {
 
@@ -575,6 +382,230 @@ void EdgeDetector::removeAllDoorLines(){
     for ( int i = 0; i < doorPoints.size() ; i ++ ){
         std::string id = "doorLine" + boost::to_string( i );
         line_viewer->removeShape( id ); 
+    }
+}
+//create a viewer that holds lines and a point cloud.
+void EdgeDetector::updateViewer( const PointCloud::ConstPtr &cloud,
+                   const std::vector< LinePosArray > & planarLines )
+{
+
+    //remove the shapes so that they can be updated.
+    line_viewer->removeAllShapes( view1);
+    //update the point cloud
+    line_viewer->updatePointCloud( cloud, "cloud");
+
+    //print out the number of planes.
+    cout << "Number of Planes: " << planes.size() << endl;
+
+    //Display all of the edge lines in the line_viewer.
+    for( int i = 0; i < planarLines.size(); i ++ ){
+        const LinePosArray lines = planarLines[i];
+
+        //The every two points constitute a lines (two endpoints)
+        for ( int j = 0; j < lines.size() ; j += 2 ){
+            const pcl::PointXYZ start = lines[ j ];
+            const pcl::PointXYZ end   = lines[ j+1 ];
+            
+            cv::Vec3i color = colors[ (i / 2) % colors.size() ];
+            if ( i % 2 == 1 ){
+                color *= 0.2;
+            }
+            line_viewer->addLine(start, end,
+                            color[0], color[1], color[2],
+                            "line" +  boost::to_string( j*100 +i ),
+                             view1 );
+        }
+
+    }
+    
+    cout << "handlePoints Size: " << handlePoints->size() << endl;
+    for ( int i = 0; i < 20 && i < handlePoints->size(); i ++ ){
+        const int a = rand() % handlePoints->size();
+        const int b = rand() % handlePoints->size();
+        const Point & p0 = curr_cloud->points[ handlePoints->at(a) ];
+        const Point & p1 = curr_cloud->points[ handlePoints->at(b) ];
+
+        line_viewer->addLine(p0, p1, 255, 255, 0,
+                            "handle" +  boost::to_string( i ),
+                             view1 );
+        cout << "added handle lines" << endl;
+    }
+    line_viewer->spinOnce (100);
+    
+}
+
+
+
+//initialize point cloud viewer
+void EdgeDetector::initViewer( const PointCloud::ConstPtr & cloud )
+{
+
+    // set the intrinsics for the camera. This is necessary for 
+    // projecting the points into real space.
+    u0 = cloud->width / 2;
+    v0 = cloud->height / 2;
+    
+    fx = deviceFocalLength;
+    fy = deviceFocalLength;
+    segmenter.setCameraIntrinsics( fx, fy, u0, v0 );
+
+    //set up the color handler for the point cloud viewer. this will
+    //enable showing color
+    ColorHandler rgb( cloud );  
+     
+    //create the dual view ports for the viewer.
+    line_viewer->createViewPort( 0.0 , 0.0, 0.5, 1.0, view1 );
+    line_viewer->createViewPort( 0.5 , 0.0, 1.0, 1.0, view2 );
+     
+    //Set up the cloud viewer;
+    //  set the bg colors, camera position, coordinate system, and the 
+    line_viewer->addPointCloud<Point> ( cloud, rgb,  "cloud", view2);
+    line_viewer->setPointCloudRenderingProperties 
+       (pcl::visualization::PCL_VISUALIZER_POINT_SIZE,
+        1, "cloud", view2);
+    line_viewer->setBackgroundColor( 0, 0, 0, view2 );
+    line_viewer->setBackgroundColor( 0.1, 0.1, 0.1 , view1 );
+    line_viewer->addCoordinateSystem (0.1);
+    line_viewer->setCameraPosition(0,0,-3.5, 0,-1, 0);
+
+    //set the size of the image viewers. 
+    image_viewer->setPosition( 700, 10 );
+    image_viewer->setSize( 640, 480 );
+    plane_viewer->setPosition( 60, 10 );
+    plane_viewer->setSize( 640, 480 );
+
+    //set the callbacks for the gui.
+    plane_viewer->registerMouseCallback(mouseClick, (void*)this);
+    plane_viewer->registerKeyboardCallback( keyboardEventOccurred,
+                                            (void*)this );
+    viewerIsInitialized = true;
+
+}
+
+
+void EdgeDetector::run()
+{
+
+#ifndef __APPLE__ 
+    pcl::OpenNIGrabber* interface = new pcl::OpenNIGrabber();
+    boost::function<
+        void (const PointCloud::ConstPtr&)> f =
+        boost::bind (&EdgeDetector::cloud_cb_, this, _1);
+    interface->registerCallback (f);
+
+    fx = interface->getDevice()->getDepthFocalLength() / pixel_size;
+    fy = fx;
+
+
+    interface->start ();
+
+    while (!line_viewer->wasStopped())
+    {
+        boost::this_thread::sleep (boost::posix_time::seconds (1));
+    }
+
+    interface->stop();
+
+#endif
+}
+
+//point cloud callback function gets new pointcloud and runs segmentation
+//algorithm
+void EdgeDetector::cloud_cb_ (const PointCloud::ConstPtr &cloud)
+{
+    curr_cloud = cloud;
+    if ( !viewerIsInitialized ){
+        initViewer( cloud );
+    }
+
+    if ( !line_viewer->wasStopped() ){
+        planes.clear();
+        std::vector< LinePosArray > planarLines;
+        if ( doWrite ){
+            savePointCloud( *cloud );
+        } else {
+            
+            segmenter.segment( cloud, planes, planarLines, image_viewer );
+        }
+        updateViewer( cloud, planarLines );
+    }
+    waitAndDisplay();
+    cout << "ended Call back\n";
+}
+
+//this program will run until the reader throws an error about 
+//a non-existant file.
+void EdgeDetector::runWithInputFile()
+{
+    while ( true ){
+        if ( !line_viewer->wasStopped() ){
+            planes.clear();
+            std::vector< LinePosArray > planarLines;
+            PointCloud::Ptr cloud (new PointCloud );
+            readPointCloud( cloud );
+            curr_cloud = cloud;
+
+            if ( !viewerIsInitialized ){
+                initViewer( cloud );
+            }
+
+            segmenter.segment( cloud, planes, planarLines, image_viewer );
+            updateViewer( cloud, planarLines );
+        }  
+        waitAndDisplay();        
+    }
+
+}
+
+//aves pcd files from grabbed pointclouds
+void EdgeDetector::savePointCloud(const PointCloud & cloud)
+{
+    static int index = 0;
+
+    pcl::io::savePCDFileBinary(filename + 
+                               boost::to_string( index ) + ".pcd"
+                               , cloud);
+    index ++;
+    cout << "Saving point cloud number: " << index << "\n";
+}
+
+//reads existing pcd files
+void EdgeDetector::readPointCloud(PointCloud::Ptr & cloud)
+{
+    static int index = 0;
+    try {
+        if (pcl::io::loadPCDFile<Point> (filename + 
+                                         boost::to_string( index )
+                                         +".pcd", *cloud) == -1)
+        {
+            cerr << "Couldn't read file "+filename+
+                     boost::to_string( index ) +".pcd" << endl;
+            exit(-1);
+        }
+    }
+    catch (std::exception &e){
+        cout << "Error reading pcd file" << e.what() << endl;
+    }
+    index ++;
+}
+
+
+
+inline void EdgeDetector::convertColor( PointCloud::Ptr & cloud,
+                   cv::Mat & mat,
+                   pcl::PointIndices::Ptr inliers)
+{
+    cv::Mat newMat = mat.reshape( 1, mat.cols * mat.rows );
+    
+    for (int i = 0; i < inliers->indices.size(); i++)
+    {
+        uint8_t colorVal = newMat.at<uint8_t>( 
+                           inliers->indices[i] , 0 );
+
+        uint8_t r(255), g( 255 - colorVal ), b( 255 - colorVal );
+        uint32_t rgb = (static_cast<uint32_t>(r) << 16 |
+             static_cast<uint32_t>(g) << 8 | static_cast<uint32_t>(b));
+        cloud->points[i].rgb = *reinterpret_cast<float*>(&rgb);
     }
 }
 

@@ -48,6 +48,9 @@ public:
     float fx, fy, u0, v0;
     bool waiting;
 
+    int current_grasp_index;
+    
+
     Eigen::Vector2i handle0, handle1;
 
     //these hold information on the current plane 
@@ -80,6 +83,14 @@ public:
                      Eigen::Vector3f & doorPos, 
                      Eigen::Vector3f & doorRot );
 
+    //the length is how long the door hangle is, the
+    //upward thickness of the door handle.
+    //The offset is an (x,y,z) vector offset from the center of the door.
+    //Or maybe 
+    void getHandleInfo( double & length, double & height,
+                        Eigen::Vector3f & center );
+
+
     //add a u, v point to the set of points,
     int addDoorPoint ( int u, int v);
 
@@ -92,7 +103,6 @@ public:
     //reorder them so that they do.
     void orderPoints();
 
-    int current_grasp_index;
 
     void getHandlePoints( pcl::IndicesPtr & indices );
     double distanceFromPlane( const pcl::PointXYZRGBA & point,
