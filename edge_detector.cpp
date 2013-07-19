@@ -420,7 +420,6 @@ void EdgeDetector::removeAllDoorLines(){
 void EdgeDetector::updateViewer( const PointCloud::ConstPtr &cloud,
                    const std::vector< LinePosArray > & planarLines )
 {
-
     //remove the shapes so that they can be updated.
     line_viewer->removeAllShapes( view1);
     //update the point cloud
@@ -448,6 +447,7 @@ void EdgeDetector::updateViewer( const PointCloud::ConstPtr &cloud,
                              view1 );
         }
     }
+    line_viewer->spinOnce (100);
 }
 
 void EdgeDetector::drawHandle(){
