@@ -6,6 +6,7 @@ filename = ../../doorpcds/drexel
 maxPlaneNumber = 6
 minPlaneSize = 50000
 optimize = true
+normalWeight = 0.1
 planeThreshold = 0.06
 sacMethod = 0
    #different sac segmentation types

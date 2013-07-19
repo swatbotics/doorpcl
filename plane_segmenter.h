@@ -44,7 +44,12 @@ public:
     void segment(const PointCloud::ConstPtr &cloud, 
                  std::vector< plane_data > & planes, 
                  std::vector< LinePosArray > & linePositions,
-                  pcl::visualization::ImageViewer * viewer=NULL  );
+                 bool useNormalSegmentation = false,
+                 pcl::visualization::ImageViewer * viewer=NULL  );
+    void normal_segment(const PointCloud::ConstPtr &cloud, 
+                        std::vector< plane_data > & planes, 
+                        std::vector< LinePosArray > & linePositions,
+                        pcl::visualization::ImageViewer * viewer=NULL  );
 
     //set the hough line parameters
     void setHoughLinesBinary( float rho, float theta, int threshold,
@@ -100,6 +105,7 @@ private:
     bool haveSetCamera;
  
     pcl::SACSegmentation<Point> seg;
+    pcl::SACSegmentationFromNormals< Point , pcl::Normal> seg_normal;
 
     //this modifies the vector "larger" in place, and resizes it.
     //This function assumes that both structures hold integer

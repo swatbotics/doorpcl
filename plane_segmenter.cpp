@@ -1,10 +1,12 @@
 #include "plane_segmenter.h"
+#include <pcl/features/normal_3d.h>
+#include <pcl/sample_consensus/model_types.h>
 
 
 PlaneSegmenter::PlaneSegmenter( const std::string & configFileName ){
     SimpleConfig config( configFileName );
 
-    double planeThreshold;
+    double planeThreshold, normalWeight;
     int sacMethod;
     bool optimize;
 
@@ -14,13 +16,18 @@ PlaneSegmenter::PlaneSegmenter( const std::string & configFileName ){
     optimize = config.getBool("optimize");
     config.get("planeThreshold", planeThreshold);
     config.get("sacMethod" , sacMethod );
+    config.get("normalWeight", normalWeight);
 
-    // Optional
     seg.setOptimizeCoefficients (optimize );
-    // Mandatory
     seg.setModelType (pcl::SACMODEL_PLANE);
     seg.setMethodType ( sacMethod );
     seg.setDistanceThreshold ( planeThreshold );
+
+    seg_normal.setOptimizeCoefficients (optimize );
+    seg_normal.setModelType (pcl::SACMODEL_NORMAL_PLANE);
+    seg_normal.setNormalDistanceWeight ( normalWeight );
+    seg_normal.setMethodType ( sacMethod );
+    seg_normal.setDistanceThreshold ( planeThreshold );
 
     //get Hough parameters from config file 
     config.get("binary_rhoRes", binary_rhoRes);
@@ -133,12 +140,17 @@ void PlaneSegmenter::setFilterParams ( int blur, int filterSize,
 void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
                              std::vector< plane_data > & planes, 
                              std::vector< LinePosArray > & linePositions,
-                             pcl::visualization::ImageViewer * viewer ) 
+                             bool useNormalSegmentation,
+                             pcl::visualization::ImageViewer * viewer) 
 {   
     
     //if the camera parameters have not been set, the program will not work, so abort
     assert( haveSetCamera );
     
+    if (useNormalSegmentation ){
+        normal_segment( cloud, planes, linePositions, viewer );
+    }
+
     //initialize the model coefficients for the plane and 
     //send the cloud to the segmenter for segmentation
     pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
@@ -202,6 +214,89 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
     while( linePositions.size() < maxPlaneNumber );
 
 }
+
+void PlaneSegmenter::normal_segment(const PointCloud::ConstPtr &cloud, 
+                                    std::vector< plane_data > & planes, 
+                                    std::vector< LinePosArray > & linePositions,
+                                    pcl::visualization::ImageViewer * viewer  )
+{   
+
+    //initialize the model coefficients for the plane and 
+    //send the cloud to the segmenter for segmentation
+    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
+
+    //initialize the normal cloud and estimator
+    pcl::NormalEstimation< Point , pcl::Normal> ne;
+    pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
+    pcl::search::KdTree< Point >::Ptr tree (new pcl::search::KdTree< Point > ());
+    
+    // Estimate point normals
+    ne.setSearchMethod (tree);
+    ne.setInputCloud ( cloud->makeShared() );
+    ne.setKSearch (20);
+    ne.compute (*cloud_normals);
+
+    seg_normal.setInputCloud ( cloud->makeShared() );
+
+    //initialize the indices containers, set outliers to be all of the
+    //points inside the point cloud. 
+    pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
+    pcl::IndicesPtr outliers ( new std::vector<int> );
+    outliers->resize( cloud->height * cloud->width );
+
+    for ( int i = 0; i < outliers->size(); i ++ ){
+        (*outliers)[i] = i;
+    }
+
+    //This do while loop is the main segmentation loop.
+    //The loop quits once the max number of planes has been reached, or
+    //until the segmenter returns a plane that is smaller than the 
+    //minPlaneSize.
+    do{
+
+        //this performs segmentation on only the indices that are 
+        //in outliers. 
+        seg_normal.setIndices( outliers );
+
+        //Perform segmentation of the plane. store the coefficients of the plane 
+        //, and the inliers on the plane.
+        //THe coefficients are in Ax + By + Cz + D = 0 form. 
+        seg_normal.segment (*inliers, *coefficients);
+
+
+        //If the size of the found plane is too small, exit the segmenter.
+        if ( inliers->indices.size () <= minPlaneSize ) { 
+            return;
+        }
+
+
+        planes.resize( planes.size() + 1 );
+        planes.back().coeffs = *coefficients;
+
+        //Find the lines in the plane and store them in the planarLines and
+        //intensityLines vectors.
+        LineArray planarLines;
+        LineArray intensityLines;
+        findLines( inliers, cloud, planes, planarLines, intensityLines, viewer );
+ 
+        //transforms the lines in the plane into lines in space.
+        linePositions.resize( linePositions.size() + 1 );
+        linesToPositions(coefficients, planarLines, linePositions.back() );
+        linePositions.resize( linePositions.size() + 1 );        
+        linesToPositions(coefficients, intensityLines, linePositions.back() );
+
+        //remove the indices in from outliers that are in inliers.
+        //This allows plane segmentation to be repeated on all of the points
+        //that are not in planes that have already been found.
+        filterOutIndices( *outliers, inliers->indices );
+
+    }
+    //if the number of planes found is greater than or equal to the max number of 
+    //planes, then quit
+    while( linePositions.size() < maxPlaneNumber );
+
+}
+
 
 //Removes segmented planes from the point cloud
 //This algorithm has runs in linear time in the amount of outliers.
