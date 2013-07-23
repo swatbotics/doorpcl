@@ -50,10 +50,14 @@ EdgeDetector::EdgeDetector( const std::string & configFile )
     //Initialize the separate views for the camera.
     view1 = 0;
     view2 = 0;
+
+    handleIndices = pcl::IndicesPtr ( new std::vector< int > );
+
+
+    //TODO: turn this into an rviz display
     line_viewer = new pcl::visualization::PCLVisualizer( "Line Viewer" ) ;
     line_viewer->initCameraParameters();
     
-    handleIndices = pcl::IndicesPtr ( new std::vector< int > );
 
     image_viewer = new pcl::visualization::ImageViewer( "Image Viewer" );
     plane_viewer = new pcl::visualization::ImageViewer( "Plane Viewer" );
@@ -71,11 +75,6 @@ EdgeDetector::EdgeDetector( const std::string & configFile )
     colors.push_back( cv::Vec3i ( 125, 125, 255 ));
 
 }
-
-
-
-
-
 
 pcl::PointXYZ EdgeDetector::projectPoint( int u, int v, int p )
 {
@@ -167,10 +166,7 @@ void EdgeDetector::left_of_switch( const int index1, const int index2, const int
         std::swap( drawPoints[index1], drawPoints[ index2 ] );
         std::swap( doorPoints[index1], doorPoints[ index2 ] );
     }
-
 }
-
-
 
 void EdgeDetector::waitAndDisplay ()
 {
@@ -181,7 +177,6 @@ void EdgeDetector::waitAndDisplay ()
     frame_index = 0;
     while (this->waiting)
     {
-
         const cv::Mat & matrix = 
                 planes[ frame_index ].image;
 
@@ -214,7 +209,6 @@ double EdgeDetector::distanceFromPlane( const pcl::PointXYZRGBA & point,
     }
     return distance;
 }
-
 
 void EdgeDetector::getHandlePoints( )
 {
@@ -261,7 +255,6 @@ void EdgeDetector::getHandlePoints( )
         handleAxis[1] = handleCoeffs.values[4];
         handleAxis[2] = handleCoeffs.values[5];
     }
-
     drawHandle();
 }
 
@@ -287,7 +280,6 @@ void EdgeDetector::getDoorInfo(double & height, double & width,
                         doorPoints[3].y,
                         doorPoints[3].z);
   
-  
     //since most doors are taller than they are wide, we set the height
     //of the door equal to the larger dimension and the width equal
     //to the smaller one
@@ -310,7 +302,6 @@ void EdgeDetector::getDoorInfo(double & height, double & width,
 
     doorPos = ((p0 + p1 + p2 + p3) / 4);
     
-    
     //TODO : This may not be correct, the indices could be wrong.
     //Find the correct indices, or find the opencv functions
     //this is a roll, pitch, yaw vector of angles.
@@ -323,8 +314,6 @@ void EdgeDetector::getDoorInfo(double & height, double & width,
 
     cout << "Roll: " << doorRot[0] << "\tPitch: " << doorRot[1] << "\tYaw: "
          << doorRot[2] << endl;
-
-
 }
 
 void EdgeDetector::getHandleInfo( double & length, double & height,
@@ -403,7 +392,7 @@ void EdgeDetector::drawLines ()
                         1.0, 0, 0, "points");
         line_viewer->addLine(start3D, end3D,
                         255, 0, 0,
-                        "doorLine" +  std::to_string( i ),
+                        "doorLine" +  boost::to_string( i ),
                          view1 );
 
     }
@@ -412,7 +401,7 @@ void EdgeDetector::drawLines ()
 void EdgeDetector::removeAllDoorLines(){
     plane_viewer->removeLayer( "points" );
     for ( int i = 0; i < doorPoints.size() ; i ++ ){
-        std::string id = "doorLine" + std::to_string( i );
+        std::string id = "doorLine" + boost::to_string( i );
         line_viewer->removeShape( id ); 
     }
 }
@@ -444,7 +433,7 @@ void EdgeDetector::updateViewer( const PointCloud::ConstPtr &cloud,
             }
             line_viewer->addLine(start, end,
                             color[0], color[1], color[2],
-                            "line" +  std::to_string( j*100 +i ),
+                            "line" +  boost::to_string( j*100 +i ),
                              view1 );
         }
     }
@@ -461,7 +450,7 @@ void EdgeDetector::drawHandle(){
         const Point & p1 = curr_cloud->points[ handleIndices->at( b ) ];
         
         line_viewer->addLine(p0, p1, 0, 0, 255,
-                            "handleSecond" +  std::to_string( i ),
+                            "handleSecond" +  boost::to_string( i ),
                              view1 );
 
 
@@ -525,7 +514,6 @@ void EdgeDetector::run()
 {
 
 #ifndef __APPLE__ 
-/*
     pcl::OpenNIGrabber* interface = new pcl::OpenNIGrabber();
     boost::function<
         void (const PointCloud::ConstPtr&)> f =
@@ -544,9 +532,8 @@ void EdgeDetector::run()
     }
 
     interface->stop();
-*/
+
 #endif
-std::cout << "The run function has been removed because it does not compile\n";
 }
 
 //point cloud callback function gets new pointcloud and runs segmentation
@@ -603,7 +590,7 @@ void EdgeDetector::savePointCloud(const PointCloud & cloud)
     static int index = 0;
 
     pcl::io::savePCDFileBinary(filename + 
-                               std::to_string( index ) + ".pcd"
+                               boost::to_string( index ) + ".pcd"
                                , cloud);
     index ++;
     cout << "Saving point cloud number: " << index << "\n";
@@ -615,11 +602,11 @@ void EdgeDetector::readPointCloud(PointCloud::Ptr & cloud)
     static int index = 0;
     try {
         if (pcl::io::loadPCDFile<Point> (filename + 
-                                         std::to_string( index )
+                                         boost::to_string( index )
                                          +".pcd", *cloud) == -1)
         {
             cerr << "Couldn't read file "+filename+
-                     std::to_string( index ) +".pcd" << endl;
+                     boost::to_string( index ) +".pcd" << endl;
             exit(-1);
         }
     }

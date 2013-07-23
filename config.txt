@@ -1,6 +1,6 @@
 #this is our config file
 
-filename = ../frames/sample
+filename = ../doorpcds/drexel/sample
 
 #plane segmenter parameters
 maxPlaneNumber = 6

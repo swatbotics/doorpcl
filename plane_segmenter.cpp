@@ -1,5 +1,9 @@
 #include "plane_segmenter.h"
+ 
+#define CV_AA 16
+#define CV_GRAY2BGR 8
 
+using namespace cv;
 
 PlaneSegmenter::PlaneSegmenter( const std::string & configFileName ){
     SimpleConfig config( configFileName );

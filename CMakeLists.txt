@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
 
-set (CMAKE_CXX_FLAGS "-g")
+set (CMAKE_CXX_FLAGS "-g -std=c++0x")
 
 project(edge_detector)
 
