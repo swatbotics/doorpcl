@@ -74,9 +74,6 @@ EdgeDetector::EdgeDetector( const std::string & configFile )
 
 
 
-
-
-
 pcl::PointXYZ EdgeDetector::projectPoint( int u, int v, int p )
 {
 
@@ -107,37 +104,104 @@ pcl::PointXYZ EdgeDetector::projectPoint( int u, int v, int p )
     return pcl::PointXYZ( x, y, z );
 }
 
-int EdgeDetector::addDoorPoint ( int u, int v)
-{
-    pcl::PointXYZ point3D = projectPoint( u, v, frame_index );
-    int indexAdded;
 
-    if ( doorPoints.size() < 4 ){
-        doorPoints.push_back( point3D );
-        drawPoints.push_back( Eigen::Vector2i( u , v ) );
-        indexAdded = doorPoints.size() - 1;
+//add a point to the door points 
+bool EdgeDetector::addDoorPoint( int u, int v, int index ){
+    if ( doorPoints.size < 4 && index < doorPoints.size() ){
 
-    }else {
-       //replace the point that it is closest to, or 
-       int closestIndex = -1;
-       int minDistance = 1000000;
+        pcl::PointXYZ point3D ( projectPoint( u, v, frame_index ) );
+        Eigen::Vector2i point2D (u, v );
 
-       for ( int i = 0; i < 4; i ++ ){
-           const int delta_u = drawPoints[i][0] - u ;
-           const int delta_v = drawPoints[i][1] - v ;
-           const int dist2 = delta_u * delta_u + delta_v * delta_v;
-           if ( dist2 < minDistance ){
-               minDistance = dist2;
-               closestIndex = i;
-           }
-       }
-       doorPoints[ closestIndex ] = point3D;
-       drawPoints[ closestIndex ] = Eigen::Vector2i( u, v );
+        //add the points 
+        if ( index < 0 ){
+            doorPoints.push_back( point3D );
+            drawPoints.push_back( point2D);
+        }
+        else{
+            doorPoints[ index ] = point3D;
+            drawPoints[ index ] = point2D;
+        }
 
-       indexAdded = closestIndex;
+        orderDoorPoints();
+        return true;
     }
-    return indexAdded;
+
+    //return false if a door point was not added
+    return false;
 }
+
+
+//handle the mouse clicks for the door.
+void EdgeDetector::doorMouseClick ( int u, int v)
+{
+    int indexAdded;
+    
+    //A point is being grasped if the current grasp index is 0 or 
+    //greater - If a mouse click occurs after that, the grasping ends,
+    //and the grasp index returns to -1.
+    if ( current_grasp_index >= 0 ){
+        current_grasp_index = -1;
+    }
+    else {
+
+        //if there are points in the list, check them to see if one is 
+        //within the proper radius
+        //if a point is within the proper radius, return so that 
+        //another point is not added
+        if ( doorPoints.size() > 0 ){
+
+            //get the radius squared.
+            const int radius2 = radius * radius;
+            int closestIndex, minDist2;
+            findClosestDrawPoint( u, v, closestIndex, minDist2 );
+            
+            //if the click point is within the radius of a current 
+            //draw point, then grasp the point
+            if ( minDist2 <= radius * radius ){
+                std::cout << "Grabbing Point" ;
+                current_grasp_index = closestIndex;
+            
+            //if drawPoints does not have four items, then add 
+            //a point to the back
+            }else if ( doorPoints.size() < 4 ){
+                addDoorPoint( u,v );
+
+            //if drawPoints is full, append an item to the back
+            }else {
+                addDoorPoint( u, v, closestIndex );
+            }
+        }
+    }
+}
+
+//find the closest point and return the index and distance squared
+void EdgeDetector::findClosestDrawPoint( int u, int v, 
+                                        int & closestIndex,
+                                        int & minDist2         ){
+
+   closestIndex = -1;
+   minDist2 = 1000000;
+
+   for ( int i = 0; i < drawPoints.size() ; i ++ ){
+       const int delta_u = drawPoints[i][0] - u ;
+       const int delta_v = drawPoints[i][1] - v ;
+       const int dist2 = delta_u * delta_u + delta_v * delta_v;
+
+       if ( dist2 < minDistance ){
+           minDist2 = dist2;
+           closestIndex = i;
+       }
+   }
+}
+
+//handles the movement of the mouse. If a point is being grasped,
+//then it moves to the current location of the mouse
+void EdgeDetector::doorMouseMovement( int u, int v ){
+    if ( current_grasp_index >=0 ){
+        addDoorPoint( u, v, current_grasp_index );
+    }
+}
+
 
 //this function uses a left of test to make sure that all of the
 //points are in the correct order.
@@ -171,6 +235,42 @@ void EdgeDetector::left_of_switch( const int index1, const int index2, const int
 }
 
 
+void EdgeDetector::handleMouseSelection( int u1, int v1, int u2, int v2 ){
+    handle0[0] = u1; 
+    handle0[1] = v0 * 2 - v1;
+    
+    handle1[0] = u2;
+    handle1[1] = v0 * 2 - v2;
+
+    getHandlePoints();
+
+}
+
+
+void EdgeDetector::inputPointCloud( const PointCloud::ConstPtr & cloud,
+                                    bool view ){
+
+    //reset a lot of stuff
+    doorPoints.clear();
+    drawPoints.clear();
+    handle0 = Eigen::Vector2i( -1, -1 );
+    handle1 = Eigen::Vector2i( -1, -1 );
+    planes.clear();
+
+    curr_cloud = cloud;
+
+    std::vector< LinePosArray > planarLines;
+
+    segmenter.segment( cloud, planes, planarLines, image_viewer );
+    
+    if ( view ){
+        if ( !viewerIsInitialized ){
+            initViewer( cloud );
+        }
+        updateViewer( cloud, planarLines );
+        waitAndDisplay();
+    }
+}
 
 void EdgeDetector::waitAndDisplay ()
 {
@@ -520,34 +620,6 @@ void EdgeDetector::initViewer( const PointCloud::ConstPtr & cloud )
 
 }
 
-
-void EdgeDetector::run()
-{
-
-#ifndef __APPLE__ 
-/*
-    pcl::OpenNIGrabber* interface = new pcl::OpenNIGrabber();
-    boost::function<
-        void (const PointCloud::ConstPtr&)> f =
-        boost::bind (&EdgeDetector::cloud_cb_, this, _1);
-    interface->registerCallback (f);
-
-    fx = interface->getDevice()->getDepthFocalLength() / pixel_size;
-    fy = fx;
-
-
-    interface->start ();
-
-    while (!line_viewer->wasStopped())
-    {
-        boost::this_thread::sleep (boost::posix_time::seconds (1));
-    }
-
-    interface->stop();
-*/
-#endif
-std::cout << "The run function has been removed because it does not compile\n";
-}
 
 //point cloud callback function gets new pointcloud and runs segmentation
 //algorithm

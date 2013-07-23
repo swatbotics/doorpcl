@@ -76,13 +76,20 @@ public:
 
     //a simple constructor using a config file.
     EdgeDetector ( const std::string & configFile );
-
+    //find the closest point and return the index and distance squared
+    void findClosestDrawPoint( int u, int v, 
+                               int & closestIndex,
+                               int & minDist2 );
     //this function will run until the reader throws an error about 
     //a non-existant file.
     void runWithInputFile();
 
     //run with input from the camera
     void run ();
+
+    void inputPointCloud( const PointCloud::ConstPtr & cloud,
+                          bool view ){
+
 
     //the doorPos is the position of the center of the door,
     void getDoorInfo(double & height, double & width,
@@ -97,13 +104,19 @@ public:
                         Eigen::Vector3f & center );
 
 
-    //add a u, v point to the set of points,
-    int addDoorPoint ( int u, int v);
+    //add a u, v point to the set of door points. 
+    //if the index is anything but -1, then the
+    //point at that index will be modified
+    //returns false if an invalid index was given
+    bool addDoorPoint ( int u, int v, int index = -1);
+    void doorMouseClick( int u, int v );
+    void doorMouseMovement( int u, int v );
 
     //draw the lines that the segmenter found
     void drawLines ();
     void drawHandle();
     pcl::PointXYZ projectPoint( int u, int v, int p );
+    void handleMouseSelection( int u1, int v1, int u2, int v2 );
 
     //if the points do not follow a counter clockwise ordering,
     //reorder them so that they do.

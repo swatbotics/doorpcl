@@ -32,6 +32,8 @@ public:
     typedef pcl::PointCloud<Point> PointCloud;
     typedef std::vector< cv::Vec4i > LineArray;
     typedef std::vector< pcl::PointXYZ > LinePosArray;
+
+    bool getLines;
     
     PlaneSegmenter( const std::string & configFileName );
     PlaneSegmenter(int maxNumPlanes=6, int minSize=50000,

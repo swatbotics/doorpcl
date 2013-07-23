@@ -2,6 +2,10 @@
 
 filename = ../doorpcds/drexel/sample
 
+#should be use the plane segmenter to
+#get the edges of the scene?
+getLines = false
+
 #plane segmenter parameters
 maxPlaneNumber = 6
 minPlaneSize = 50000

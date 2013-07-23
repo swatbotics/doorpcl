@@ -53,6 +53,7 @@ PlaneSegmenter::PlaneSegmenter( const std::string & configFileName ){
     config.get( "filterSize", filterSize);
     config.get( "intensityErosionSize", intensityErosionSize);
     config.get( "lineDilationSize", lineDilationSize );
+    getLines = config.getBool( "getLines" );
 
     haveSetCamera = false;
 }
@@ -73,6 +74,7 @@ PlaneSegmenter::PlaneSegmenter( int maxNumPlanes, int minSize,
     seg.setDistanceThreshold ( threshold );
 
     haveSetCamera = false;
+    getLines = false;
 }
 
 //Sets focal length and initial points for vision algorithm
@@ -182,18 +184,21 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
 
         planes.resize( planes.size() + 1 );
         planes.back().coeffs = *coefficients;
-
-        //Find the lines in the plane and store them in the planarLines and
-        //intensityLines vectors.
-        LineArray planarLines;
-        LineArray intensityLines;
-        findLines( inliers, cloud, planes, planarLines, intensityLines, viewer );
- 
-        //transforms the lines in the plane into lines in space.
-        linePositions.resize( linePositions.size() + 1 );
-        linesToPositions(coefficients, planarLines, linePositions.back() );
-        linePositions.resize( linePositions.size() + 1 );        
-        linesToPositions(coefficients, intensityLines, linePositions.back() );
+        
+        //only get the lines if we want them
+        if ( getLines ){
+            //Find the lines in the plane and store them in the planarLines and
+            //intensityLines vectors.
+            LineArray planarLines;
+            LineArray intensityLines;
+            findLines( inliers, cloud, planes, planarLines, intensityLines, viewer );
+     
+            //transforms the lines in the plane into lines in space.
+            linePositions.resize( linePositions.size() + 1 );
+            linesToPositions(coefficients, planarLines, linePositions.back() );
+            linePositions.resize( linePositions.size() + 1 );        
+            linesToPositions(coefficients, intensityLines, linePositions.back() );
+        }
 
         //remove the indices in from outliers that are in inliers.
         //This allows plane segmentation to be repeated on all of the points
