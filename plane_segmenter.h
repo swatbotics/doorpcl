@@ -19,10 +19,6 @@
 
 #include "SimpleConfig.h"
 
-struct plane_data {
-    pcl::ModelCoefficients coeffs;
-    cv::Mat image;
-};
 
 class PlaneSegmenter{
 
@@ -44,8 +40,9 @@ public:
     //if the user wants to display an image of the lines and planes in 2d, then
     //the user can input a pointer to an image viewer.
     void segment(const PointCloud::ConstPtr &cloud, 
-                 std::vector< plane_data > & planes, 
+                 std::vector< pcl::ModelCoefficients coeffs > & planes, 
                  std::vector< LinePosArray > & linePositions,
+                  cv::Mat & planeImage, cv::Mat & intensityImage,
                   pcl::visualization::ImageViewer * viewer=NULL  );
 
     //set the hough line parameters
@@ -107,7 +104,9 @@ private:
     //This function assumes that both structures hold integer
     //values that get larger. 
     inline void filterOutIndices( std::vector< int > & larger,
-                           const std::vector<int> & remove     );
+                           const std::vector<int> & remove,
+                           cv::Mat & planeImage,
+                           const int index     );
 
     //this takes a set of indices (validPoints) and sets the corresponding
     //cells in a matrix to 255. The matrix should start out as a matrix of all

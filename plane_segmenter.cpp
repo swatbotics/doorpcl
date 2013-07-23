@@ -137,17 +137,18 @@ void PlaneSegmenter::setFilterParams ( int blur, int filterSize,
 
 //Planar segmentation function
 void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
-                             std::vector< plane_data > & planes, 
+                             std::vector< pcl::ModelCoefficients coeffs > & planes, 
                              std::vector< LinePosArray > & linePositions,
+                             cv::Mat & planeImage, cv::Mat & intensityImage,
                              pcl::visualization::ImageViewer * viewer ) 
 {   
     
     //if the camera parameters have not been set, the program will not work, so abort
     assert( haveSetCamera );
     
-    //initialize the model coefficients for the plane and 
-    //send the cloud to the segmenter for segmentation
-    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
+    planeImage = cv::Mat( cloud->height, cloud->width,
+                          CV_8UC1, cv::Scalar( 255 ) );
+
     seg.setInputCloud ( cloud->makeShared() );
 
     //initialize the indices containers, set outliers to be all of the
@@ -159,6 +160,8 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
     for ( int i = 0; i < outliers->size(); i ++ ){
         (*outliers)[i] = i;
     }
+
+    cloudToMatIntensity( *outliers, intensityImage, cloud );
 
     //This do while loop is the main segmentation loop.
     //The loop quits once the max number of planes has been reached, or
@@ -173,17 +176,17 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
         //Perform segmentation of the plane. store the coefficients of the plane 
         //, and the inliers on the plane.
         //THe coefficients are in Ax + By + Cz + D = 0 form. 
-        seg.segment (*inliers, *coefficients);
+
+        planes.resize( planes.size() + 1 );
+        seg.segment (*inliers, planes.back() );
 
 
         //If the size of the found plane is too small, exit the segmenter.
         if ( inliers->indices.size () <= minPlaneSize ) { 
+            planes.pop_back();
             return;
         }
 
-
-        planes.resize( planes.size() + 1 );
-        planes.back().coeffs = *coefficients;
         
         //only get the lines if we want them
         if ( getLines ){
@@ -203,7 +206,9 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
         //remove the indices in from outliers that are in inliers.
         //This allows plane segmentation to be repeated on all of the points
         //that are not in planes that have already been found.
-        filterOutIndices( *outliers, inliers->indices );
+        filterOutIndices( *outliers, inliers->indices,
+                          planeImage,
+                          planes.size() - 1 );
 
     }
     //if the number of planes found is greater than or equal to the max number of 
@@ -221,17 +226,24 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
 //      2. The vector 'remove' must be a subset of 'larger' 
 //      3. 
 inline void PlaneSegmenter::filterOutIndices( std::vector< int > & larger,
-                       const std::vector<int> & remove){
+                       const std::vector<int> & remove
+                       cv::Mat & planeImage, const int index){
     int j = 0; // the index into the 'remove' vector
     int k = 0; // the index into the 'larger' vector
                // This index holds the next place in 'larger' that an index will
                // be stored, facilitating the in place modification of 'larger'
 
     for( int i = 0; i < larger.size() ; i ++ ){
-
+        
+        //if the index is in both larger and remove, then it 
+        //should be removed
         if ( j < remove.size() && larger[i] == remove[j] ){
+            //store the plane that each member of remove is on
+            planeImage.data[ remove[j] ] == index;
             j++;
         }
+        //if the index is not in remove, then store it in the 
+        //first empty position of larger.
         else{
             larger[k] = larger[i];
             k ++;
@@ -262,6 +274,10 @@ inline void PlaneSegmenter::cloudToMatIntensity(const std::vector< int > &
                                                 cv::Mat &mat,
                                                 const PointCloud::ConstPtr & cloud)
 {
+    if (mat.data == NULL ){
+        mat = cv::Mat( cloud->height, cloud->width, CV_8UC1 );
+    }
+
     //set the values of mat that correspond to being on the major
     // plane of interest.
     //A non-zero value is on the plane and the value corresponds to the average of

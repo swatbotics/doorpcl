@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
-
 set (CMAKE_CXX_FLAGS "-g -std=c++0x")
+
 
 project(edge_detector)
 
-find_package(PCL 1.2 REQUIRED)
+#find_package(PCL 1.2 REQUIRED)
+
 include(FindPkgConfig)
 pkg_search_module(OPENCV REQUIRED opencv>=2.3 opencv-2.3.1)
 
@@ -13,6 +14,8 @@ include_directories(${OPENCV_INCLUDE_DIRS})
 include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
+
+add_subdirectory( rospkg )
 
 set(HDRS plane_segmenter.h  strutils.h SimpleConfig.h edge_detector.h)
 set(SRCS plane_segmenter.cpp edge_detector.cpp )

@@ -2,7 +2,7 @@
 #define EDGE_DETECTOR
 
 #include <string>
-
+#include <sensor_msgs/PointCloud2.h>
 #include <pcl/point_types.h>
 
 #include <pcl/visualization/pcl_visualizer.h>
@@ -13,7 +13,6 @@
 #include <pcl/console/parse.h>
 
 #include "plane_segmenter.h"
-
 #include "SimpleConfig.h"
 
 
@@ -56,10 +55,12 @@ public:
 
     Eigen::Vector2i handle0, handle1;
 
+    cv::Mat planeImage, currentIntensityImage;
+
     //these hold information on the current plane 
     //segmented picture.
     PointCloud::ConstPtr curr_cloud;
-    std::vector<plane_data> planes;
+    std::vector< pcl::ModelCoefficients > planes;
 
     int frame_index;    //the index of the plane currently
                         //being viewed
@@ -179,8 +180,6 @@ private:
                        pcl::PointIndices::Ptr inliers);
 
 };
-
-
 
 
 #endif

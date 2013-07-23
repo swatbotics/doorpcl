@@ -78,10 +78,10 @@ pcl::PointXYZ EdgeDetector::projectPoint( int u, int v, int p )
 {
 
     //extract the coefficients of the plane
-    const float & A = planes[ p ].coeffs.values[0];
-    const float & B = planes[ p ].coeffs.values[1];
-    const float & C = planes[ p ].coeffs.values[2];
-    const float & D = planes[ p ].coeffs.values[3];
+    const float & A = planes[ p ].values[0];
+    const float & B = planes[ p ].values[1];
+    const float & C = planes[ p ].values[2];
+    const float & D = planes[ p ].values[3];
     
     //this corrects for the inversion of the axes in
     //the pcl image viewer point indexing.
@@ -261,7 +261,8 @@ void EdgeDetector::inputPointCloud( const PointCloud::ConstPtr & cloud,
 
     std::vector< LinePosArray > planarLines;
 
-    segmenter.segment( cloud, planes, planarLines, image_viewer );
+    segmenter.segment( cloud, planes, planarLines, planeImage,
+                       currentIntensityImage,  image_viewer );
     
     if ( view ){
         if ( !viewerIsInitialized ){
@@ -282,10 +283,9 @@ void EdgeDetector::waitAndDisplay ()
     while (this->waiting)
     {
 
-        const cv::Mat & matrix = 
-                planes[ frame_index ].image;
-
-        plane_viewer->showRGBImage( matrix.data, matrix.cols, matrix.rows);
+        plane_viewer->showRGBImage( currentIntensityImage.data,
+                                    currentIntensityImage.cols,
+                                    currentIntensityImage.rows);
         plane_viewer->spinOnce();
     }
     doorPoints.clear();
@@ -298,10 +298,10 @@ double EdgeDetector::distanceFromPlane( const pcl::PointXYZRGBA & point,
                                         & coeffs ){
 
     //extract the coefficients of the plane
-    const float & A = planes[ frame_index ].coeffs.values[0];
-    const float & B = planes[ frame_index ].coeffs.values[1];
-    const float & C = planes[ frame_index ].coeffs.values[2];
-    const float & D = planes[ frame_index ].coeffs.values[3];
+    const float & A = planes[ frame_index ].values[0];
+    const float & B = planes[ frame_index ].values[1];
+    const float & C = planes[ frame_index ].values[2];
+    const float & D = planes[ frame_index ].values[3];
     
     const float numer = A * point.x + B * point.y + C * point.z + D;
     const float denom = sqrt( A*A + B*B + C*C );
@@ -330,7 +330,7 @@ void EdgeDetector::getHandlePoints( )
             //the below indexing is invalid
             const pcl::PointXYZRGBA & p = curr_cloud->at( i, j );
             const double distance = distanceFromPlane( p,
-                                                 planes[frame_index].coeffs );
+                                                 planes[frame_index] );
 
             //if the distance is far off the plane, then it is on 
             if ( distance > minDistOffPlane && distance < maxDistOffPlane )
@@ -637,7 +637,9 @@ void EdgeDetector::cloud_cb_ (const PointCloud::ConstPtr &cloud)
             savePointCloud( *cloud );
         } else {
             
-            segmenter.segment( cloud, planes, planarLines, image_viewer );
+            segmenter.segment( cloud, planes, planarLines,
+                               planeImage, currentIntensityImage,
+                               image_viewer );
         }
         updateViewer( cloud, planarLines );
     }
@@ -661,7 +663,9 @@ void EdgeDetector::runWithInputFile()
                 initViewer( cloud );
             }
 
-            segmenter.segment( cloud, planes, planarLines, image_viewer );
+            segmenter.segment( cloud, planes, planarLines,
+                               planeImage, currentIntensityImage,
+                               image_viewer );
             updateViewer( cloud, planarLines );
         }  
         waitAndDisplay();        
