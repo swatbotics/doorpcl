@@ -137,7 +137,7 @@ void PlaneSegmenter::setFilterParams ( int blur, int filterSize,
 
 //Planar segmentation function
 void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
-                             std::vector< pcl::ModelCoefficients coeffs > & planes, 
+                             std::vector< pcl::ModelCoefficients > & planes, 
                              std::vector< LinePosArray > & linePositions,
                              cv::Mat & planeImage, cv::Mat & intensityImage,
                              pcl::visualization::ImageViewer * viewer ) 
@@ -213,7 +213,7 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
     }
     //if the number of planes found is greater than or equal to the max number of 
     //planes, then quit
-    while( linePositions.size() < maxPlaneNumber );
+    while( planes.size() < maxPlaneNumber );
 
 }
 

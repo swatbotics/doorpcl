@@ -40,7 +40,7 @@ public:
     //if the user wants to display an image of the lines and planes in 2d, then
     //the user can input a pointer to an image viewer.
     void segment(const PointCloud::ConstPtr &cloud, 
-                 std::vector< pcl::ModelCoefficients coeffs > & planes, 
+                 std::vector< pcl::ModelCoefficients > & planes, 
                  std::vector< LinePosArray > & linePositions,
                   cv::Mat & planeImage, cv::Mat & intensityImage,
                   pcl::visualization::ImageViewer * viewer=NULL  );
@@ -116,17 +116,16 @@ private:
     inline void cloudToMatBinary(const std::vector< int > & validPoints,
                            cv::Mat &mat                            );
 
-    inline void cloudToMatIntensity(
-                                        const std::vector< int > & validPoints,
-                                        cv::Mat &mat,
-                                        const PointCloud::ConstPtr & cloud);
+    inline void cloudToMatIntensity(const std::vector< int > & validPoints,
+                                    cv::Mat &mat,
+                                    const PointCloud::ConstPtr & cloud);
 
 
     //This takes an image (preferably a binary image) and performs the canny
     //edge detection algorithm. Then a houghLine algorithm is run to extract lines
     inline void findLines(const pcl::PointIndices::Ptr & inliers,
                           const PointCloud::ConstPtr & cloud,
-                          std::vector< plane_data > & planes, 
+                          std::vector< pcl::ModelCoefficients > & planes, 
                           LineArray & planarLines,
                           LineArray & intensityLines,
                           pcl::visualization::ImageViewer * viewer );
