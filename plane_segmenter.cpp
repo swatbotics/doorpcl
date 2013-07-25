@@ -227,19 +227,19 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
 //      3. 
 inline void PlaneSegmenter::filterOutIndices( std::vector< int > & larger,
                        const std::vector<int> & remove,
-                       cv::Mat & planeImage, const int index){
+                       cv::Mat & planeImage, size_t index){
     int j = 0; // the index into the 'remove' vector
     int k = 0; // the index into the 'larger' vector
                // This index holds the next place in 'larger' that an index will
                // be stored, facilitating the in place modification of 'larger'
-
+    
     for( int i = 0; i < larger.size() ; i ++ ){
         
         //if the index is in both larger and remove, then it 
         //should be removed
         if ( j < remove.size() && larger[i] == remove[j] ){
-            //store the plane that each member of remove is on
-            planeImage.data[ remove[j] ] == index;
+            //store the plane that each member of remove is o
+            planeImage.data[ remove[j] ] = (uint8_t)index;
             j++;
         }
         //if the index is not in remove, then store it in the 

@@ -1,6 +1,6 @@
 #this is our config file
 
-filename = ../doorpcds/swarthmore/sample
+filename = ../../doorpcds/swarthmore/sample
 
 #should be use the plane segmenter to
 #get the edges of the scene?

@@ -104,7 +104,6 @@ int EdgeDetector::getDoorPlane( ){
     //are on a plane for the given plane index.
     std::vector<int> planeVals;
     planeVals.resize( planes.size() );
-
     for ( int i = min[0]; i < max[0] ; i ++ ){
         for ( int j = min[1]; j < max[1] ; j ++ ){
 
@@ -157,7 +156,7 @@ bool EdgeDetector::isWithinBounds(int u, int v ){
 
 
         //if the points fail the 'left of' test, then swap them
-        if ( test[2] < 0 ){
+        if ( test[2] > 0 ){
             return false;
         }
 
@@ -701,8 +700,8 @@ void EdgeDetector::makeDisplayImage(){
             for ( int k = 0; k < 3 ; k ++ ){
               
                 uint8_t colorVal = currentIntensityImage.at<uint8_t>(i, j);
-                if ( planeImage.at<uint8_t>(i, j) == frame_index ){
-                        colorVal += colors[planeImage.at<uint8_t>(i, j)
+                if (planeImage.at<uint8_t>(i, j) == (uint8_t)frame_index){
+                    colorVal += (uint8_t)colors[planeImage.at<uint8_t>(i, j)
                                            % colors.size() ][k];
                 }
                     displayImage.at<cv::Vec3b>(i, j)[k] = colorVal;

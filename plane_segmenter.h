@@ -106,7 +106,7 @@ private:
     inline void filterOutIndices( std::vector< int > & larger,
                            const std::vector<int> & remove,
                            cv::Mat & planeImage,
-                           const int index     );
+                           size_t index     );
 
     //this takes a set of indices (validPoints) and sets the corresponding
     //cells in a matrix to 255. The matrix should start out as a matrix of all
