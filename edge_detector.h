@@ -104,6 +104,9 @@ public:
     void getHandleInfo( double & length, double & height,
                         Eigen::Vector3f & center );
 
+    //This is for getting the door plane.
+    int getDoorPlane();
+    bool isWithinBounds( int u, int v );
 
     //add a u, v point to the set of door points. 
     //if the index is anything but -1, then the
@@ -122,6 +125,8 @@ public:
     //if the points do not follow a counter clockwise ordering,
     //reorder them so that they do.
     void orderPoints();
+
+    void setDoorPoints();
 
 
     void getHandlePoints();

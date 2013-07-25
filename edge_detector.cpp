@@ -70,6 +70,94 @@ EdgeDetector::EdgeDetector( const std::string & configFile )
 
 }
 
+void EdgeDetector::setDoorPoints(){
+    assert( drawPoints.size() == 4 );
+
+    doorPoints.resize( drawPoints.size() );
+    for ( int i = 0; i < drawPoints.size() ; i ++ ){
+        doorPoints[i] = projectPoint( drawPoints[i][0], drawPoints[i][1], frame_index );
+    }
+}
+
+int EdgeDetector::getDoorPlane( ){
+    
+    assert( drawPoints.size() == 4 );
+
+    //get the extents of the area to search in.
+    Eigen::Vector2i min(100000, 100000), max(0,0);
+
+    for ( int i = 0; i < drawPoints.size() ; i ++ ){
+        for ( int j = 0 ; j < 2 ; j++ ){
+            if ( drawPoints[i][j] > max[j] ){
+                max[j] = drawPoints[i][j];
+            }
+            if ( drawPoints[i][j] < min[j] ){
+                min[j] = drawPoints[i][j];
+            }
+        }
+    }
+
+    //Use the extents to get a bounding box within
+    //which we can check for points inside the door 
+    //area we have demarked
+    //The planeVals vector will hold the amount points that
+    //are on a plane for the given plane index.
+    std::vector<int> planeVals;
+    planeVals.resize( planes.size() );
+
+    for ( int i = min[0]; i < max[0] ; i ++ ){
+        for ( int j = min[1]; j < max[1] ; j ++ ){
+
+            int index = planeImage.at<uint8_t>( i, j );
+            if ( index < planes.size() && isWithinBounds( i, j ) ){
+                planeVals[ index ] ++;
+            }
+        }
+    }
+    
+    //this function gets the max value and the corresponding index
+    //in the planeVals vector. This is the plane which most of the
+    //points are on 
+    int maxval(-1 ), maxindex( -1);
+    for ( int i = 0; i < planeVals.size() ; i ++ ){
+        if ( planeVals[i] > maxval ){
+            maxval = planeVals[i];
+            maxindex = i;
+        }
+    }
+
+    return maxindex; 
+}
+
+
+//This uses a left of test to find out if a point u,v 
+//is contained within the quadrilateral created by the 
+//door points.
+bool EdgeDetector::isWithinBounds(int u, int v ){
+ 
+    Eigen::Vector2i currentPoint( u, v );
+    for ( int i = 0; i < drawPoints.size() ; i ++ ){
+
+        int j;
+        if ( i == drawPoints.size() - 1 ){ j = 0 ; }
+        else { j = i + 1 ; }
+
+        const Eigen::Vector2i to1 = drawPoints[i] - drawPoints[j];
+        const Eigen::Vector2i to2 = currentPoint  - drawPoints[j];
+        
+        const Eigen::Vector3i to1_3D (to1[0], to1[1], 0 );
+        const Eigen::Vector3i to2_3D (to2[0], to2[1], 0 );
+        const Eigen::Vector3i test = to1_3D.cross( to2_3D );
+
+
+        //if the points fail the 'left of' test, then swap them
+        if ( test[2] < 0 ){
+            return false;
+        }
+
+    }
+    return true;
+}
 
 
 pcl::PointXYZ EdgeDetector::projectPoint( int u, int v, int p )
@@ -105,23 +193,23 @@ pcl::PointXYZ EdgeDetector::projectPoint( int u, int v, int p )
 
 //add a point to the door points 
 bool EdgeDetector::addDoorPoint( int u, int v, const int index ){
-    pcl::PointXYZ point3D ( projectPoint( u, v, frame_index ) );
     Eigen::Vector2i point2D (u, v );
 
     //add the points 
-    if ( index < 0 && doorPoints.size() < 4 ){
-        doorPoints.push_back( point3D );
+    if ( index < 0 && drawPoints.size() < 4 ){
         drawPoints.push_back( point2D);
     }
-    else if ( index < doorPoints.size() ){
-        doorPoints[ index ] = point3D;
+    else if ( index < drawPoints.size() ){
         drawPoints[ index ] = point2D;
+        if (doorPoints.size() == 4 ){
+            doorPoints[ index ] = projectPoint( u, v , frame_index );
+        }
     }
     else{
         return false;
     }
 
-    if (doorPoints.size() == 4 ){
+    if (drawPoints.size() == 4 ){
         orderPoints();
     }
         
@@ -144,32 +232,39 @@ void EdgeDetector::doorMouseClick ( int u, int v)
 
         //if there are points in the list, check them to see if one is 
         //within the proper radius
-        //if a point is within the proper radius, return so that 
-        //another point is not added
-        if ( doorPoints.size() >= 0 ){
+        //if a point is within the proper radius, do not add another point 
 
-            //get the radius squared.
-            const int radius2 = radius * radius;
-            int closestIndex, minDist2;
-            findClosestDrawPoint( u, v, closestIndex, minDist2 );
-            
-            //if the click point is within the radius of a current 
-            //draw point, then grasp the point
-            if ( minDist2 <= radius * radius ){
-                std::cout << "Grabbing Point" ;
-                current_grasp_index = closestIndex;
-            
-            //if drawPoints does not have four items, then add 
-            //a point to the back
-            }else if ( doorPoints.size() < 4 ){
-                addDoorPoint( u,v );
-                std::cout << "added Point number: " << doorPoints.size() <<
-                          "\n";
-            //if drawPoints is full, append an item to the back
-            }else {
-                addDoorPoint( u, v, closestIndex );
-                std::cout << "Replaced Point\n";
-            }
+        //get the radius squared.
+        const int radius2 = radius * radius;
+        int closestIndex, minDist2;
+        findClosestDrawPoint( u, v, closestIndex, minDist2 );
+        
+        //if the click point is within the radius of a current 
+        //draw point, then grasp the point
+        if ( minDist2 <= radius * radius ){
+            std::cout << "Grabbing Point" ;
+            current_grasp_index = closestIndex;
+        
+        //if drawPoints does not have four items, then add 
+        //a point to the back
+        }else if ( drawPoints.size() < 4 ){
+            addDoorPoint( u,v );
+            std::cout << "added Point number: " << drawPoints.size() <<
+                      "\n";
+        //if drawPoints is full, append an item to the back
+        }else {
+            addDoorPoint( u, v, closestIndex );
+            std::cout << "Replaced Point\n";
+        }
+    }
+
+    //If there are 4 
+    if (drawPoints.size() == 4 && current_grasp_index < 0 ){
+        
+        int new_frame_index = getDoorPlane();
+        if ( new_frame_index != frame_index || doorPoints.size() < 4 ){
+            frame_index = new_frame_index;
+            setDoorPoints();
         }
     }
 }
@@ -207,7 +302,8 @@ void EdgeDetector::doorMouseMovement( int u, int v ){
 //points are in the correct order.
 void EdgeDetector::orderPoints()
 {
-    
+    assert( drawPoints.size() == 4 );
+
     left_of_switch( 0, 1, 3 );
     left_of_switch( 1, 2, 3 );
     left_of_switch( 0, 1, 3 );
@@ -229,7 +325,9 @@ void EdgeDetector::left_of_switch( const int index1, const int index2, const int
     if ( test[2] < 0 )
     {
         std::swap( drawPoints[index1], drawPoints[ index2 ] );
-        std::swap( doorPoints[index1], doorPoints[ index2 ] );
+        if ( doorPoints.size() == 4 ){
+            std::swap( doorPoints[index1], doorPoints[ index2 ] );
+        }
     }
 
 }
@@ -478,7 +576,6 @@ void EdgeDetector::drawLines ()
         return;
     }
 
-    assert(drawPoints.size() == doorPoints.size());
 
     for ( int i = 0; i < drawPoints.size() ; i ++ ){
         if ( i == drawPoints.size() - 1 &&
@@ -486,28 +583,43 @@ void EdgeDetector::drawLines ()
             return;
         }
 
-        pcl::PointXYZ start3D, end3D;
         Eigen::Vector2i start2D, end2D;
         start2D = drawPoints[ i ];
-        start3D = doorPoints[ i ];
         
         if ( i + 1 >= drawPoints.size() ){
             end2D   = drawPoints[ 0 ];
-            end3D = doorPoints[ 0 ];
         } else{
             end2D   = drawPoints[ i+1 ];
-            end3D = doorPoints[ i + 1 ];
         }
         
 
         plane_viewer->addLine(start2D[0], start2D[1], end2D[0], end2D[1],
                         1.0, 0, 0, "points");
+
+    }
+
+    for ( int i = 0; i < doorPoints.size() ; i ++ ){
+        if ( i == drawPoints.size() - 1 &&
+            drawPoints.size() != 4        ){
+            return;
+        }
+
+        pcl::PointXYZ start3D, end3D;
+        start3D = doorPoints[ i ];
+        
+        if ( i + 1 >= doorPoints.size() ){
+            end3D = doorPoints[ 0 ];
+        } else{
+            end3D = doorPoints[ i + 1 ];
+        }
+
         line_viewer->addLine(start3D, end3D,
                         255, 0, 0,
                         "doorLine" +  boost::to_string( i ),
                          view1 );
 
     }
+
 }
 
 void EdgeDetector::removeAllDoorLines(){
@@ -820,6 +932,7 @@ void keyboardEventOccurred (const pcl::visualization::KeyboardEvent
 {
     EdgeDetector * detect = ( EdgeDetector *) detector;
 
+    /*
     //show previous plane
     if (event.getKeySym () == "a" && event.keyDown ())
     {
@@ -845,9 +958,9 @@ void keyboardEventOccurred (const pcl::visualization::KeyboardEvent
         cout << "displaying next frame" << endl;
         detect->makeDisplayImage();
     }
-
+    */
     //pause and unpause
-    else if (event.getKeySym () == "p" && event.keyDown ())
+    if (event.getKeySym () == "p" && event.keyDown ())
     {
         if (detect->waiting)
         {
