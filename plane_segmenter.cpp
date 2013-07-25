@@ -198,9 +198,9 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
      
             //transforms the lines in the plane into lines in space.
             linePositions.resize( linePositions.size() + 1 );
-            linesToPositions(coefficients, planarLines, linePositions.back() );
+            linesToPositions(planes.back(), planarLines, linePositions.back() );
             linePositions.resize( linePositions.size() + 1 );        
-            linesToPositions(coefficients, intensityLines, linePositions.back() );
+            linesToPositions(planes.back(), intensityLines, linePositions.back() );
         }
 
         //remove the indices in from outliers that are in inliers.
@@ -226,7 +226,7 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
 //      2. The vector 'remove' must be a subset of 'larger' 
 //      3. 
 inline void PlaneSegmenter::filterOutIndices( std::vector< int > & larger,
-                       const std::vector<int> & remove
+                       const std::vector<int> & remove,
                        cv::Mat & planeImage, const int index){
     int j = 0; // the index into the 'remove' vector
     int k = 0; // the index into the 'larger' vector
@@ -288,17 +288,18 @@ inline void PlaneSegmenter::cloudToMatIntensity(const std::vector< int > &
         const Point p = cloud->points[ index ];
         const Eigen::Vector3i rgb( p.getRGBVector3i() );
         const uint8_t intensity = ( rgb[0] + rgb[1] + rgb[2] ) / 3; 
-        mat.at<uint8_t>( index, 1 ) = intensity;
+        mat.data[ index ] = intensity;
     }
 }
 
 //Find depth and color lines from segmented plane
-inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
-                                       const PointCloud::ConstPtr & cloud,
-                                       std::vector< plane_data > & planes, 
-                                      LineArray & planarLines,
-                                      LineArray & intensityLines,
-                                      pcl::visualization::ImageViewer * viewer )
+inline void PlaneSegmenter::findLines(
+                 const pcl::PointIndices::Ptr & inliers,
+                 const PointCloud::ConstPtr & cloud,
+                 std::vector< pcl::ModelCoefficients > & planes, 
+                  LineArray & planarLines,
+                  LineArray & intensityLines,
+                  pcl::visualization::ImageViewer * viewer )
 {
      
     cv::Mat binary, intensity, mask, copyBinary, copyIntensity, maskedIntensity;
@@ -408,27 +409,23 @@ inline void PlaneSegmenter::findLines( const pcl::PointIndices::Ptr & inliers,
             }
         }
         viewer->showRGBImage( cdst.data, cdst.cols, cdst.rows );
-        //planes.back().image = cv::Mat::zeros( cloud->width, cloud->height , CV_8UC1 );
-        //copyIntensity.copyTo( planes.back().image, copyBinary ); 
-        copyIntensity.copyTo( planes.back().image, copyBinary );
-        cv::cvtColor( planes.back().image, planes.back().image, CV_GRAY2BGR );
 
-      }      
-   }
+    }      
+}
 
 
 //this solves for the position of all of the line endpoint in the
 //these equations have been solved analytically. 
 inline void PlaneSegmenter::linesToPositions( 
-                              const pcl::ModelCoefficients::Ptr & coeffs,
+                              const pcl::ModelCoefficients & coeffs,
                               const LineArray & lines, 
                               LinePosArray & linePositions               ){
 
     //extract the coefficients of the plane
-    const float A = coeffs->values[0];
-    const float B = coeffs->values[1];
-    const float C = coeffs->values[2];
-    const float D = coeffs->values[3];
+    const float A = coeffs.values[0];
+    const float B = coeffs.values[1];
+    const float C = coeffs.values[2];
+    const float D = coeffs.values[3];
      
     //Project each point onto the plane
     for( int i = 0; i < lines.size(); i ++ ){

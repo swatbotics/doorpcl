@@ -55,7 +55,7 @@ public:
 
     Eigen::Vector2i handle0, handle1;
 
-    cv::Mat planeImage, currentIntensityImage;
+    cv::Mat planeImage, currentIntensityImage, displayImage;
 
     //these hold information on the current plane 
     //segmented picture.
@@ -89,7 +89,7 @@ public:
     void run ();
 
     void inputPointCloud( const PointCloud::ConstPtr & cloud,
-                          bool view ){
+                          bool view );
 
 
     //the doorPos is the position of the center of the door,
@@ -109,7 +109,7 @@ public:
     //if the index is anything but -1, then the
     //point at that index will be modified
     //returns false if an invalid index was given
-    bool addDoorPoint ( int u, int v, int index = -1);
+    bool addDoorPoint ( int u, int v, const int index = -1);
     void doorMouseClick( int u, int v );
     void doorMouseMovement( int u, int v );
 
@@ -127,12 +127,13 @@ public:
     void getHandlePoints();
     double distanceFromPlane( const pcl::PointXYZRGBA & point,
                               const pcl::ModelCoefficients & coeffs);
-    
+    void makeDisplayImage();
 
 
 private:
     SimpleConfig config;
 
+    
 
     //this holds a set of colors for visualization
     std::vector< cv::Vec3i > colors;

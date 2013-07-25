@@ -1,6 +1,4 @@
 #include "edge_detector.h"
-#include <pcl/sample_consensus/sac_model_cylinder.h>
-#include <pcl/features/normal_3d.h>
 #include <pcl/sample_consensus/method_types.h>
 #include <pcl/sample_consensus/model_types.h>
 #include <pcl/segmentation/sac_segmentation.h>
@@ -106,35 +104,35 @@ pcl::PointXYZ EdgeDetector::projectPoint( int u, int v, int p )
 
 
 //add a point to the door points 
-bool EdgeDetector::addDoorPoint( int u, int v, int index ){
-    if ( doorPoints.size < 4 && index < doorPoints.size() ){
+bool EdgeDetector::addDoorPoint( int u, int v, const int index ){
+    pcl::PointXYZ point3D ( projectPoint( u, v, frame_index ) );
+    Eigen::Vector2i point2D (u, v );
 
-        pcl::PointXYZ point3D ( projectPoint( u, v, frame_index ) );
-        Eigen::Vector2i point2D (u, v );
-
-        //add the points 
-        if ( index < 0 ){
-            doorPoints.push_back( point3D );
-            drawPoints.push_back( point2D);
-        }
-        else{
-            doorPoints[ index ] = point3D;
-            drawPoints[ index ] = point2D;
-        }
-
-        orderDoorPoints();
-        return true;
+    //add the points 
+    if ( index < 0 && doorPoints.size() < 4 ){
+        doorPoints.push_back( point3D );
+        drawPoints.push_back( point2D);
+    }
+    else if ( index < doorPoints.size() ){
+        doorPoints[ index ] = point3D;
+        drawPoints[ index ] = point2D;
+    }
+    else{
+        return false;
     }
 
-    //return false if a door point was not added
-    return false;
+    if (doorPoints.size() == 4 ){
+        orderPoints();
+    }
+        
+
+    return true;
 }
 
 
 //handle the mouse clicks for the door.
 void EdgeDetector::doorMouseClick ( int u, int v)
 {
-    int indexAdded;
     
     //A point is being grasped if the current grasp index is 0 or 
     //greater - If a mouse click occurs after that, the grasping ends,
@@ -148,7 +146,7 @@ void EdgeDetector::doorMouseClick ( int u, int v)
         //within the proper radius
         //if a point is within the proper radius, return so that 
         //another point is not added
-        if ( doorPoints.size() > 0 ){
+        if ( doorPoints.size() >= 0 ){
 
             //get the radius squared.
             const int radius2 = radius * radius;
@@ -165,10 +163,12 @@ void EdgeDetector::doorMouseClick ( int u, int v)
             //a point to the back
             }else if ( doorPoints.size() < 4 ){
                 addDoorPoint( u,v );
-
+                std::cout << "added Point number: " << doorPoints.size() <<
+                          "\n";
             //if drawPoints is full, append an item to the back
             }else {
                 addDoorPoint( u, v, closestIndex );
+                std::cout << "Replaced Point\n";
             }
         }
     }
@@ -187,7 +187,7 @@ void EdgeDetector::findClosestDrawPoint( int u, int v,
        const int delta_v = drawPoints[i][1] - v ;
        const int dist2 = delta_u * delta_u + delta_v * delta_v;
 
-       if ( dist2 < minDistance ){
+       if ( dist2 < minDist2 ){
            minDist2 = dist2;
            closestIndex = i;
        }
@@ -282,10 +282,11 @@ void EdgeDetector::waitAndDisplay ()
     frame_index = 0;
     while (this->waiting)
     {
-
-        plane_viewer->showRGBImage( currentIntensityImage.data,
-                                    currentIntensityImage.cols,
-                                    currentIntensityImage.rows);
+        makeDisplayImage();
+        const cv::Mat & image = displayImage;
+        plane_viewer->showRGBImage( image.data,
+                                    image.cols,
+                                    image.rows);
         plane_viewer->spinOnce();
     }
     doorPoints.clear();
@@ -503,7 +504,7 @@ void EdgeDetector::drawLines ()
                         1.0, 0, 0, "points");
         line_viewer->addLine(start3D, end3D,
                         255, 0, 0,
-                        "doorLine" +  std::to_string( i ),
+                        "doorLine" +  boost::to_string( i ),
                          view1 );
 
     }
@@ -512,7 +513,7 @@ void EdgeDetector::drawLines ()
 void EdgeDetector::removeAllDoorLines(){
     plane_viewer->removeLayer( "points" );
     for ( int i = 0; i < doorPoints.size() ; i ++ ){
-        std::string id = "doorLine" + std::to_string( i );
+        std::string id = "doorLine" + boost::to_string( i );
         line_viewer->removeShape( id ); 
     }
 }
@@ -544,7 +545,7 @@ void EdgeDetector::updateViewer( const PointCloud::ConstPtr &cloud,
             }
             line_viewer->addLine(start, end,
                             color[0], color[1], color[2],
-                            "line" +  std::to_string( j*100 +i ),
+                            "line" +  boost::to_string( j*100 +i ),
                              view1 );
         }
     }
@@ -561,7 +562,7 @@ void EdgeDetector::drawHandle(){
         const Point & p1 = curr_cloud->points[ handleIndices->at( b ) ];
         
         line_viewer->addLine(p0, p1, 0, 0, 255,
-                            "handleSecond" +  std::to_string( i ),
+                            "handleSecond" +  boost::to_string( i ),
                              view1 );
 
 
@@ -571,6 +572,25 @@ void EdgeDetector::drawHandle(){
     line_viewer->addLine( handleCoeffs, "handle", view1 );
 
     line_viewer->spinOnce (100);
+}
+void EdgeDetector::makeDisplayImage(){
+    if (displayImage.data == NULL ){
+        displayImage = cv::Mat( planeImage.rows, planeImage.cols, CV_8UC3 );
+    }
+
+    for (int i = 0; i < planeImage.rows; i ++ ){
+        for( int j = 0; j < planeImage.cols; j ++ ){
+            for ( int k = 0; k < 3 ; k ++ ){
+              
+                uint8_t colorVal = currentIntensityImage.at<uint8_t>(i, j);
+                if ( planeImage.at<uint8_t>(i, j) == frame_index ){
+                        colorVal += colors[planeImage.at<uint8_t>(i, j)
+                                           % colors.size() ][k];
+                }
+                    displayImage.at<cv::Vec3b>(i, j)[k] = colorVal;
+            }
+        }
+    }
 }
 
 
@@ -668,18 +688,22 @@ void EdgeDetector::runWithInputFile()
                                image_viewer );
             updateViewer( cloud, planarLines );
         }  
-        waitAndDisplay();        
+        waitAndDisplay();       
+        cout << "waiting? " << waiting << endl; 
     }
 
 }
 
+void EdgeDetector::run(){
+    std::cout << "Run does not work because it was taken out\n";
+}
 //aves pcd files from grabbed pointclouds
 void EdgeDetector::savePointCloud(const PointCloud & cloud)
 {
     static int index = 0;
 
     pcl::io::savePCDFileBinary(filename + 
-                               std::to_string( index ) + ".pcd"
+                               boost::to_string( index ) + ".pcd"
                                , cloud);
     index ++;
     cout << "Saving point cloud number: " << index << "\n";
@@ -691,11 +715,11 @@ void EdgeDetector::readPointCloud(PointCloud::Ptr & cloud)
     static int index = 0;
     try {
         if (pcl::io::loadPCDFile<Point> (filename + 
-                                         std::to_string( index )
+                                         boost::to_string( index )
                                          +".pcd", *cloud) == -1)
         {
             cerr << "Couldn't read file "+filename+
-                     std::to_string( index ) +".pcd" << endl;
+                     boost::to_string( index ) +".pcd" << endl;
             exit(-1);
         }
     }
@@ -737,49 +761,20 @@ void mouseClick(const pcl::visualization::MouseEvent &event,
     EdgeDetector * detect = ( EdgeDetector *) detector;
     int & index = detect->current_grasp_index;
     
-    if (event.getButton () == 
-        pcl::visualization::MouseEvent::LeftButton)
-    {    
-        cout << "Left Button\n";
-        if (event.getType() == pcl::visualization::MouseEvent::MouseButtonPress )
-        {
-            if (index >= 0 ) {
-                index = -1;
-                cout << "Index reset\n";
-            } else {
+    if (event.getButton () == pcl::visualization::MouseEvent::LeftButton && 
+        event.getType() == pcl::visualization::MouseEvent::MouseButtonPress )
+    {
+        cout << "Left Mouse Click\n";
+        detect->doorMouseClick( event.getX(), event.getY() );
+        detect->drawLines();
 
-                const int radius2 = detect->radius * detect->radius;
-                for (int i = 0; i < detect->doorPoints.size(); i++ )
-                {
-                   const int delta_u = detect->drawPoints[i][0] - event.getX() ;
-                   const int delta_v = detect->drawPoints[i][1] - event.getY() ;
-
-                   const int dist2 = delta_u * delta_u + delta_v * delta_v;
-                   if ( dist2 < radius2 ){
-                       cout << "Grabbing Point\n";
-                       index = i;
-                       break;
-                   }
-                }
-                if (index < 0 ){
-                    detect->addDoorPoint( event.getX() , event.getY() );
-                }
-            }
-        }         
-        if (detect->doorPoints.size() == 4)
-        {
-            //if the points are out of order, switch their order
-            detect->orderPoints();
-
-            //TODO : this is just test code, eventually,
-            //we will remove this.
+        if (detect->doorPoints.size() == 4) {
             double height, width;
             Eigen::Vector3f doorPos, doorRot;
             detect->getDoorInfo(height, width, doorPos, doorRot);
         }
-
-        detect->drawLines();
-    }
+           
+    }         
 
     else if (event.getButton () == 
         pcl::visualization::MouseEvent::RightButton)
@@ -812,16 +807,9 @@ void mouseClick(const pcl::visualization::MouseEvent &event,
             detect->getHandlePoints( );
         }
     }
-
-    if( index >= 0 ){
-        detect->drawPoints[ index ][0] = event.getX();
-        detect->drawPoints[ index ][1] = event.getY();
-        detect->doorPoints[ index ] = 
-                detect->projectPoint( event.getX(), event.getY(), 
-                                      detect->frame_index );
-        detect->drawLines();                
+    else {
+        detect->doorMouseMovement( event.getX(), event.getY() );
     }
-
 
 } 
 
@@ -842,7 +830,7 @@ void keyboardEventOccurred (const pcl::visualization::KeyboardEvent
             detect->frame_index = detect->planes.size() - 1;
         }
         cout << "displaying previous frame" << endl;
-        
+         detect->makeDisplayImage();
     }
 
     //show next plane
@@ -855,6 +843,7 @@ void keyboardEventOccurred (const pcl::visualization::KeyboardEvent
             detect->frame_index = 0;
         }
         cout << "displaying next frame" << endl;
+        detect->makeDisplayImage();
     }
 
     //pause and unpause

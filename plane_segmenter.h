@@ -136,7 +136,7 @@ private:
     //These endpoints are then projected onto the plane to convert the 2d 
     //line positions into 3d lines on the plane.
     //the projection equations have been solved analytically. 
-    inline void linesToPositions( const pcl::ModelCoefficients::Ptr & coeffs,
+    inline void linesToPositions( const pcl::ModelCoefficients & coeffs,
                                   const LineArray & lines, 
                                   LinePosArray & linePositions               );
 
