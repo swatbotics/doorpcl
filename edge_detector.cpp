@@ -29,8 +29,8 @@ EdgeDetector::EdgeDetector( const std::string & configFile )
     //the index of the current plane that is being viewed.
     frame_index = 0;
 
-    //the radius of the tag points
-    radius = 10;
+    //the point_radius of the tag points
+    point_radius = 10;
 
     //initalize the handle bounding points
     handle0[0] = -1;
@@ -125,6 +125,7 @@ int EdgeDetector::getDoorPlane( ){
             maxindex = i;
         }
     }
+    std::cout << "total points in plane : " << maxval << std::endl;
 
     return maxindex; 
 }
@@ -136,17 +137,22 @@ int EdgeDetector::getDoorPlane( ){
 bool EdgeDetector::isWithinBounds(int u, int v ){
  
     Eigen::Vector2i currentPoint( u, v );
+
+    //iterate over each of the points 
     for ( int i = 0; i < drawPoints.size() ; i ++ ){
 
         int j;
         if ( i == drawPoints.size() - 1 ){ j = 0 ; }
         else { j = i + 1 ; }
 
+        //get the vectors going from point i to point j, and point j to currentPoint
         const Eigen::Vector2i to1 = drawPoints[i] - drawPoints[j];
         const Eigen::Vector2i to2 = currentPoint  - drawPoints[j];
         
         const Eigen::Vector3i to1_3D (to1[0], to1[1], 0 );
         const Eigen::Vector3i to2_3D (to2[0], to2[1], 0 );
+
+        //get the crossproduct 
         const Eigen::Vector3i test = to1_3D.cross( to2_3D );
 
 
@@ -231,17 +237,17 @@ void EdgeDetector::doorMouseClick ( int u, int v)
     else {
 
         //if there are points in the list, check them to see if one is 
-        //within the proper radius
-        //if a point is within the proper radius, do not add another point 
+        //within the proper point_radius
+        //if a point is within the proper point_radius, do not add another point 
 
-        //get the radius squared.
-        const int radius2 = radius * radius;
+        //get the point_radius squared.
+        const int radius2 = point_radius * point_radius;
         int closestIndex, minDist2;
         findClosestDrawPoint( u, v, closestIndex, minDist2 );
         
-        //if the click point is within the radius of a current 
+        //if the click point is within the point_radius of a current 
         //draw point, then grasp the point
-        if ( minDist2 <= radius * radius ){
+        if ( minDist2 <= point_radius * point_radius ){
             std::cout << "Grabbing Point" ;
             current_grasp_index = closestIndex;
         
@@ -569,7 +575,7 @@ void EdgeDetector::drawLines ()
         const std::string shape_id = "points";
     
         plane_viewer->markPoint( drawPoints[i][0], drawPoints[i][1],
-            red_color, red_color, radius, shape_id, opacity);
+            red_color, red_color, point_radius, shape_id, opacity);
     }
 
     if ( doorPoints.size() < 2 ){

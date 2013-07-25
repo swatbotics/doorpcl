@@ -42,7 +42,7 @@ public:
     const float pixel_size;
     bool viewerIsInitialized, doWrite;
     bool showImage;
-    double radius, minDistOffPlane, maxDistOffPlane;
+    double point_radius, minDistOffPlane, maxDistOffPlane;
 
     float fx, fy, u0, v0;
     bool waiting;
