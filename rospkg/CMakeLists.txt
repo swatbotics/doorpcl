@@ -1,46 +1,21 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(my_pcl_tutorial)
+project(door_finder)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS pcl pcl_ros roscpp sensor_msgs)
 
-add_executable(doorfindernode src/ros_interface.cpp)
-target_link_libraries(doorfindernode ${catkin_LIBRARIES})
 
-## System dependencies are found with CMake's conventions
-# find_package(Boost REQUIRED COMPONENTS system)
+#get open cv
+#include(FindPkgConfig)
+#pkg_search_module(OPENCV REQUIRED opencv>=2.3 opencv-2.3.1)
+#include_directories(${OPENCV_INCLUDE_DIRS})
 
+find_package(OpenCV REQUIRED)
+include_directories(${OpenCV_INCLUDE_DIR})
+link_libraries(${OpenCV_LIBS})
 
-## Uncomment this if the package has a setup.py. This macro ensures
-## modules and global scripts declared therein get installed
-## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
-# catkin_python_setup()
-
-#######################################
-## Declare ROS messages and services ##
-#######################################
-
-## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
-
-## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
-
-## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   sensor_msgs
-# )
 
 ###################################
 ## catkin specific configuration ##
@@ -52,8 +27,8 @@ target_link_libraries(doorfindernode ${catkin_LIBRARIES})
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  INCLUDE_DIRS include ../.
-  LIBRARIES my_pcl_tutorial
+  INCLUDE_DIRS include
+  LIBRARIES door_finder
   CATKIN_DEPENDS pcl pcl_ros roscpp sensor_msgs
   DEPENDS system_lib
 )
@@ -66,6 +41,7 @@ catkin_package(
 ## Your package locations should be listed before other locations
 # include_directories(include)
 include_directories(
+  include
   ${catkin_INCLUDE_DIRS}
 )
 
@@ -74,8 +50,22 @@ include_directories(
 #   src/${PROJECT_NAME}/my_pcl_tutorial.cpp
 # )
 
+
+#set(MYHDRS plane_segmenter.h  strutils.h SimpleConfig.h edge_detector.h)
+set(MYSRCS src/plane_segmenter.cpp src/edge_detector.cpp )
+set(MYHDRS door_finder/SimpleConfig.h door_finder/strutils.h
+     door_finder/edge_detector.h door_finder/plane_segmenter.h )
+
+add_library( plane_segmenter ${MYSRCS} )
+#add_executable (edge_detector src/door_finder.cpp)
+add_executable(doorfindernode src/ros_interface.cpp)
+
+set( LIBS plane_segmenter ${PCL_LIBRARIES} ${OPENCV_LDFLAGS} ${OpenCV_LIBS} )
+#target_link_libraries (edge_detector ${LIBS} )
+target_link_libraries (doorfindernode ${LIBS} ${catkin_LIBRARIES} )
+
 ## Declare a cpp executable
-# add_executable(my_pcl_tutorial_node src/my_pcl_tutorial_node.cpp)
+
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes

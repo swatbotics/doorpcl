@@ -38,8 +38,8 @@ public:
 
     std::string filename;
 
-    const float deviceFocalLength;
-    const float pixel_size;
+    float deviceFocalLength;
+    float pixel_size;
     bool viewerIsInitialized, doWrite;
     bool showImage;
     double point_radius, minDistOffPlane, maxDistOffPlane;
@@ -74,7 +74,7 @@ public:
     //the picture plane
     std::vector< Eigen::Vector2i > drawPoints;
 
-
+    ~EdgeDetector(){} 
     //a simple constructor using a config file.
     EdgeDetector ( const std::string & configFile );
     //find the closest point and return the index and distance squared

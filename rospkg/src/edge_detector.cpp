@@ -1,14 +1,20 @@
-#include "edge_detector.h"
+#include "door_finder/edge_detector.h"
 #include <pcl/sample_consensus/method_types.h>
 #include <pcl/sample_consensus/model_types.h>
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/ModelCoefficients.h>
-
 #include <iostream>
+#include <sstream>
 
-#include <pcl/io/openni_grabber.h>
 #include <pcl/io/pcd_io.h>
 #include <boost/thread/thread.hpp>
+
+std::string to_string( int val ){
+
+     std::ostringstream stream;
+     stream << val;
+     return stream.str();
+}
 
 
 //This takes in the name of a configuration file as the input.
@@ -617,10 +623,11 @@ void EdgeDetector::drawLines ()
         } else{
             end3D = doorPoints[ i + 1 ];
         }
+	
 
         line_viewer->addLine(start3D, end3D,
                         255, 0, 0,
-                        "doorLine" +  boost::to_string( i ),
+                        "doorLine" +  to_string( i ),
                          view1 );
 
     }
@@ -630,7 +637,7 @@ void EdgeDetector::drawLines ()
 void EdgeDetector::removeAllDoorLines(){
     plane_viewer->removeLayer( "points" );
     for ( int i = 0; i < doorPoints.size() ; i ++ ){
-        std::string id = "doorLine" + boost::to_string( i );
+        std::string id = "doorLine" + to_string( i );
         line_viewer->removeShape( id ); 
     }
 }
@@ -662,7 +669,7 @@ void EdgeDetector::updateViewer( const PointCloud::ConstPtr &cloud,
             }
             line_viewer->addLine(start, end,
                             color[0], color[1], color[2],
-                            "line" +  boost::to_string( j*100 +i ),
+                            "line" +  to_string( j*100 +i ),
                              view1 );
         }
     }
@@ -679,7 +686,7 @@ void EdgeDetector::drawHandle(){
         const Point & p1 = curr_cloud->points[ handleIndices->at( b ) ];
         
         line_viewer->addLine(p0, p1, 0, 0, 255,
-                            "handleSecond" +  boost::to_string( i ),
+                            "handleSecond" +  to_string( i ),
                              view1 );
 
 
@@ -820,7 +827,7 @@ void EdgeDetector::savePointCloud(const PointCloud & cloud)
     static int index = 0;
 
     pcl::io::savePCDFileBinary(filename + 
-                               boost::to_string( index ) + ".pcd"
+                               to_string( index ) + ".pcd"
                                , cloud);
     index ++;
     cout << "Saving point cloud number: " << index << "\n";
@@ -832,11 +839,11 @@ void EdgeDetector::readPointCloud(PointCloud::Ptr & cloud)
     static int index = 0;
     try {
         if (pcl::io::loadPCDFile<Point> (filename + 
-                                         boost::to_string( index )
+                                         to_string( index )
                                          +".pcd", *cloud) == -1)
         {
             cerr << "Couldn't read file "+filename+
-                     boost::to_string( index ) +".pcd" << endl;
+                     to_string( index ) +".pcd" << endl;
             exit(-1);
         }
     }

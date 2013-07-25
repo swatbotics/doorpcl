@@ -1,4 +1,4 @@
-#include "edge_detector.h"
+#include "door_finder/edge_detector.h"
 
 
 void printUsage(){

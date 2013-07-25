@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package>
-  <name>my_pcl_tutorial</name>
+  <name>door_finder</name>
   <version>0.0.0</version>
   <description>The my_pcl_tutorial package</description>
 
