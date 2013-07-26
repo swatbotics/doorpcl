@@ -286,9 +286,9 @@ inline void PlaneSegmenter::cloudToMatIntensity(const std::vector< int > &
     for (int i=0; i < validPoints.size(); i++){
         const int index = validPoints[i];
         const Point p = cloud->points[ index ];
-        const Eigen::Vector3i rgb( p.getRGBVector3i() );
-        const uint8_t intensity = ( rgb[0] + rgb[1] + rgb[2] ) / 3; 
-        mat.data[ index ] = intensity;
+        //const Eigen::Vector3i rgb( p.getRGBVector3i() );
+        //const uint8_t intensity = ( rgb[0] + rgb[1] + rgb[2] ) / 3; 
+        mat.data[ index ] = p.intensity;
     }
 }
 

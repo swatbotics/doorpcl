@@ -359,6 +359,8 @@ void EdgeDetector::handleMouseSelection( int u1, int v1, int u2, int v2 ){
 void EdgeDetector::inputPointCloud( const PointCloud::ConstPtr & cloud,
                                     bool view ){
 
+    cout << "in inputPointCloud function" << endl;
+
     //reset a lot of stuff
     doorPoints.clear();
     drawPoints.clear();
@@ -367,18 +369,21 @@ void EdgeDetector::inputPointCloud( const PointCloud::ConstPtr & cloud,
     planes.clear();
 
     curr_cloud = cloud;
+    if ( !viewerIsInitialized ){
+        cout << "running initViewer" << endl;
+            initViewer( cloud );
+    }
 
     std::vector< LinePosArray > planarLines;
-
+    cout << "segmenting" << endl;
     segmenter.segment( cloud, planes, planarLines, planeImage,
                        currentIntensityImage,  image_viewer );
-    
+    cout << "done segmenting" << endl;
     if ( view ){
-        if ( !viewerIsInitialized ){
-            initViewer( cloud );
-        }
         updateViewer( cloud, planarLines );
+        cout << "updated viewer" << endl;
         waitAndDisplay();
+        cout << "done waiting" << endl;
     }
 }
 
@@ -403,7 +408,7 @@ void EdgeDetector::waitAndDisplay ()
     removeAllDoorLines();
 }
 
-double EdgeDetector::distanceFromPlane( const pcl::PointXYZRGBA & point,
+double EdgeDetector::distanceFromPlane( const Point & point,
                                         const pcl::ModelCoefficients 
                                         & coeffs ){
 
@@ -438,7 +443,9 @@ void EdgeDetector::getHandlePoints( )
         for ( int j = handle0[1] ; j <= handle1[1] ; j ++ ){
             //index through cloud 
             //the below indexing is invalid
-            const pcl::PointXYZRGBA & p = curr_cloud->at( i, j );
+            //const pcl::PointXYZRGBA & p = curr_cloud->at( i, j );
+            const Point & p = curr_cloud->at( i, j );
+
             const double distance = distanceFromPlane( p,
                                                  planes[frame_index] );
 
@@ -733,7 +740,7 @@ void EdgeDetector::initViewer( const PointCloud::ConstPtr & cloud )
 
     //set up the color handler for the point cloud viewer. this will
     //enable showing color
-    ColorHandler rgb( cloud );  
+    ColorHandler rgb( cloud, "intensity" );  
      
     //create the dual view ports for the viewer.
     line_viewer->createViewPort( 0.0 , 0.0, 0.5, 1.0, view1 );
@@ -741,7 +748,7 @@ void EdgeDetector::initViewer( const PointCloud::ConstPtr & cloud )
      
     //Set up the cloud viewer;
     //  set the bg colors, camera position, coordinate system, and the 
-    line_viewer->addPointCloud<Point> ( cloud, rgb,  "cloud", view2);
+    line_viewer->addPointCloud<Point> ( cloud, rgb, "cloud", view2);
     line_viewer->setPointCloudRenderingProperties 
        (pcl::visualization::PCL_VISUALIZER_POINT_SIZE,
         1, "cloud", view2);
@@ -854,7 +861,7 @@ void EdgeDetector::readPointCloud(PointCloud::Ptr & cloud)
 }
 
 
-
+/*
 inline void EdgeDetector::convertColor( PointCloud::Ptr & cloud,
                    cv::Mat & mat,
                    pcl::PointIndices::Ptr inliers)
@@ -872,7 +879,7 @@ inline void EdgeDetector::convertColor( PointCloud::Ptr & cloud,
         cloud->points[i].rgb = *reinterpret_cast<float*>(&rgb);
     }
 }
-
+*/
 
 
 //mouse click callback- currently prints out location of mouse click
@@ -929,6 +936,7 @@ void mouseClick(const pcl::visualization::MouseEvent &event,
             detect->handle1[0] = event.getX();
             detect->handle1[1] = detect->v0 * 2 - event.getY();
             detect->getHandlePoints( );
+            detect->drawHandle();
         }
     }
     else {

@@ -29,10 +29,11 @@ void keyboardEventOccurred (const pcl::visualization::KeyboardEvent
 class EdgeDetector
 {
 public:
-    typedef pcl::PointXYZRGBA Point;  
-    typedef pcl::PointCloud<Point> PointCloud;
+    //I think this still makes it recompile
+    typedef PlaneSegmenter::Point Point;  
+    typedef PlaneSegmenter::PointCloud PointCloud;
     typedef std::vector< cv::Vec4i > LineArray;
-    typedef pcl::visualization::PointCloudColorHandlerRGBField<Point> 
+    typedef pcl::visualization::PointCloudColorHandlerCustom<Point> 
                 ColorHandler;
     typedef std::vector< pcl::PointXYZ > LinePosArray;
 
@@ -130,7 +131,7 @@ public:
 
 
     void getHandlePoints();
-    double distanceFromPlane( const pcl::PointXYZRGBA & point,
+    double distanceFromPlane( const Point & point,
                               const pcl::ModelCoefficients & coeffs);
     void makeDisplayImage();
 

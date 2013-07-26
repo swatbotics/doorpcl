@@ -24,7 +24,7 @@ class PlaneSegmenter{
 
 
 public:
-    typedef pcl::PointXYZRGBA Point;  
+    typedef pcl::PointXYZI Point;  
     typedef pcl::PointCloud<Point> PointCloud;
     typedef std::vector< cv::Vec4i > LineArray;
     typedef std::vector< pcl::PointXYZ > LinePosArray;
