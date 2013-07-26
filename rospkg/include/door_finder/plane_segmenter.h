@@ -10,7 +10,6 @@
 #include <pcl/sample_consensus/method_types.h>
 #include <pcl/sample_consensus/model_types.h>
 #include <pcl/segmentation/sac_segmentation.h>
-#include <pcl/visualization/image_viewer.h>
 #include <pcl/filters/filter.h>
 #include <pcl/common/common_headers.h>
 
@@ -42,8 +41,7 @@ public:
     void segment(const PointCloud::ConstPtr &cloud, 
                  std::vector< pcl::ModelCoefficients > & planes, 
                  std::vector< LinePosArray > & linePositions,
-                  cv::Mat & planeImage, cv::Mat & intensityImage,
-                  pcl::visualization::ImageViewer * viewer=NULL  );
+                  cv::Mat & planeImage, cv::Mat & intensityImage );
 
     //set the hough line parameters
     void setHoughLinesBinary( float rho, float theta, int threshold,
@@ -127,8 +125,7 @@ private:
                           const PointCloud::ConstPtr & cloud,
                           std::vector< pcl::ModelCoefficients > & planes, 
                           LineArray & planarLines,
-                          LineArray & intensityLines,
-                          pcl::visualization::ImageViewer * viewer );
+                          LineArray & intensityLines);
     
 
     //this takes the equation of a plane (Ax + By + Cz + D = 0) as coeffs,

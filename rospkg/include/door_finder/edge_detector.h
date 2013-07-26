@@ -5,9 +5,6 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl/point_types.h>
 
-#include <pcl/visualization/pcl_visualizer.h>
-#include <pcl/visualization/image_viewer.h>
-
 #include <pcl/common/common_headers.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/console/parse.h>
@@ -18,13 +15,14 @@
 
 //mouse click callback- currently prints out location of mouse click
 //on viewer
-void mouseClick(const pcl::visualization::MouseEvent &event, void* detector);
+//void mouseClick(const pcl::visualization::MouseEvent &event, void* detector);
 
 
 //keyboard event handler callback
+/*
 void keyboardEventOccurred (const pcl::visualization::KeyboardEvent
                             &event, void* detector );
-
+*/
 
 class EdgeDetector
 {
@@ -33,16 +31,13 @@ public:
     typedef PlaneSegmenter::Point Point;  
     typedef PlaneSegmenter::PointCloud PointCloud;
     typedef std::vector< cv::Vec4i > LineArray;
-    typedef pcl::visualization::PointCloudColorHandlerCustom<Point> 
-                ColorHandler;
     typedef std::vector< pcl::PointXYZ > LinePosArray;
 
     std::string filename;
 
     float deviceFocalLength;
     float pixel_size;
-    bool viewerIsInitialized, doWrite;
-    bool showImage;
+    bool doWrite;
     double point_radius, minDistOffPlane, maxDistOffPlane;
 
     float fx, fy, u0, v0;
@@ -82,12 +77,7 @@ public:
     void findClosestDrawPoint( int u, int v, 
                                int & closestIndex,
                                int & minDist2 );
-    //this function will run until the reader throws an error about 
-    //a non-existant file.
-    void runWithInputFile();
 
-    //run with input from the camera
-    void run ();
 
     void inputPointCloud( const PointCloud::ConstPtr & cloud,
                           bool view );
@@ -118,8 +108,6 @@ public:
     void doorMouseMovement( int u, int v );
 
     //draw the lines that the segmenter found
-    void drawLines ();
-    void drawHandle();
     pcl::PointXYZ projectPoint( int u, int v, int p );
     void handleMouseSelection( int u1, int v1, int u2, int v2 );
 
@@ -144,29 +132,12 @@ private:
     //this holds a set of colors for visualization
     std::vector< cv::Vec3i > colors;
 
-    int view1, view2;
-    pcl::visualization::PCLVisualizer * line_viewer;
-    pcl::visualization::ImageViewer * image_viewer;
-    pcl::visualization::ImageViewer * plane_viewer;
-
     PlaneSegmenter segmenter;
-
-
-    //create a viewer that holds lines and a point cloud.
-    void updateViewer( const PointCloud::ConstPtr &cloud,
-                       const std::vector< LinePosArray > & planarLines );
-
-    void initViewer( const PointCloud::ConstPtr & cloud );
-    
 
 
     //this implements a left of test, and switches any 
     //points that fail the left-of test.
     void left_of_switch( const int index1, const int index2, const int index3 );
-
-    //point cloud callback function gets new pointcloud and runs segmentation
-    //algorithm
-    void cloud_cb_ (const PointCloud::ConstPtr &cloud);
 
     //This is the main door specifying event loop.
     void waitAndDisplay();
@@ -179,12 +150,6 @@ private:
 
     //reads existing pcd files
     void readPointCloud(PointCloud::Ptr & cloud);
-
-    //a utility function to change the color of a point cloud.
-    //this is currently unused.
-    inline void convertColor( PointCloud::Ptr & cloud,
-                       cv::Mat & mat,
-                       pcl::PointIndices::Ptr inliers);
 
 };
 

@@ -21,7 +21,8 @@ std::string to_string( int val ){
 EdgeDetector::EdgeDetector( const std::string & configFile )
                       : deviceFocalLength( 530.551),
                         pixel_size( 1.075 ),
-                        doWrite( false ),
+                        viewerIsInitialized( false ),
+                        doWrite( false ), showImage( false ),
                         u0( -1), v0(-1), config( configFile )
 {
     //get the handle parameters
@@ -50,7 +51,16 @@ EdgeDetector::EdgeDetector( const std::string & configFile )
     //The frame start
     waiting = true;
 
+    //Initialize the separate views for the camera.
+    view1 = 0;
+    view2 = 0;
+    line_viewer = new pcl::visualization::PCLVisualizer( "Line Viewer" ) ;
+    line_viewer->initCameraParameters();
+    
     handleIndices = pcl::IndicesPtr ( new std::vector< int > );
+
+    image_viewer = new pcl::visualization::ImageViewer( "Image Viewer" );
+    plane_viewer = new pcl::visualization::ImageViewer( "Plane Viewer" );
 
     config.get( "filename", filename );
 
@@ -290,7 +300,6 @@ void EdgeDetector::findClosestDrawPoint( int u, int v,
    }
 }
 
-
 //handles the movement of the mouse. If a point is being grasped,
 //then it moves to the current location of the mouse
 void EdgeDetector::doorMouseMovement( int u, int v ){
@@ -360,15 +369,22 @@ void EdgeDetector::inputPointCloud( const PointCloud::ConstPtr & cloud,
     planes.clear();
 
     curr_cloud = cloud;
+    if ( !viewerIsInitialized ){
+        cout << "running initViewer" << endl;
+            initViewer( cloud );
+    }
 
     std::vector< LinePosArray > planarLines;
     cout << "segmenting" << endl;
     segmenter.segment( cloud, planes, planarLines, planeImage,
-                       currentIntensityImage );
+                       currentIntensityImage,  image_viewer );
     cout << "done segmenting" << endl;
-        
-    waitAndDisplay();
-    cout << "done waiting" << endl;
+    if ( view ){
+        updateViewer( cloud, planarLines );
+        cout << "updated viewer" << endl;
+        waitAndDisplay();
+        cout << "done waiting" << endl;
+    }
 }
 
 void EdgeDetector::waitAndDisplay ()
@@ -382,8 +398,14 @@ void EdgeDetector::waitAndDisplay ()
     {
         makeDisplayImage();
         const cv::Mat & image = displayImage;
-        //TODO : display the image from here
+        plane_viewer->showRGBImage( image.data,
+                                    image.cols,
+                                    image.rows);
+        plane_viewer->spinOnce();
     }
+    doorPoints.clear();
+    drawPoints.clear();
+    removeAllDoorLines();
 }
 
 double EdgeDetector::distanceFromPlane( const Point & point,
@@ -456,9 +478,8 @@ void EdgeDetector::getHandlePoints( )
         handleAxis[1] = handleCoeffs.values[4];
         handleAxis[2] = handleCoeffs.values[5];
     }
-    
-    //TODO : we need to send the points here,
-    // so that the handle can be drawn
+
+    drawHandle();
 }
 
 
@@ -554,6 +575,135 @@ void EdgeDetector::getHandleInfo( double & length, double & height,
 
 }
 
+void EdgeDetector::drawLines ()
+{
+
+    removeAllDoorLines();
+    
+    for ( int i = 0; i < drawPoints.size() ; i ++ ){
+    
+        const pcl::visualization::Vector3ub red_color(255,0,0);
+        const double opacity = 1.0;
+        const std::string shape_id = "points";
+    
+        plane_viewer->markPoint( drawPoints[i][0], drawPoints[i][1],
+            red_color, red_color, point_radius, shape_id, opacity);
+    }
+
+    if ( doorPoints.size() < 2 ){
+        return;
+    }
+
+
+    for ( int i = 0; i < drawPoints.size() ; i ++ ){
+        if ( i == drawPoints.size() - 1 &&
+            drawPoints.size() != 4        ){
+            return;
+        }
+
+        Eigen::Vector2i start2D, end2D;
+        start2D = drawPoints[ i ];
+        
+        if ( i + 1 >= drawPoints.size() ){
+            end2D   = drawPoints[ 0 ];
+        } else{
+            end2D   = drawPoints[ i+1 ];
+        }
+        
+
+        plane_viewer->addLine(start2D[0], start2D[1], end2D[0], end2D[1],
+                        1.0, 0, 0, "points");
+
+    }
+
+    for ( int i = 0; i < doorPoints.size() ; i ++ ){
+        if ( i == drawPoints.size() - 1 &&
+            drawPoints.size() != 4        ){
+            return;
+        }
+
+        pcl::PointXYZ start3D, end3D;
+        start3D = doorPoints[ i ];
+        
+        if ( i + 1 >= doorPoints.size() ){
+            end3D = doorPoints[ 0 ];
+        } else{
+            end3D = doorPoints[ i + 1 ];
+        }
+	
+
+        line_viewer->addLine(start3D, end3D,
+                        255, 0, 0,
+                        "doorLine" +  to_string( i ),
+                         view1 );
+
+    }
+
+}
+
+void EdgeDetector::removeAllDoorLines(){
+    plane_viewer->removeLayer( "points" );
+    for ( int i = 0; i < doorPoints.size() ; i ++ ){
+        std::string id = "doorLine" + to_string( i );
+        line_viewer->removeShape( id ); 
+    }
+}
+//create a viewer that holds lines and a point cloud.
+void EdgeDetector::updateViewer( const PointCloud::ConstPtr &cloud,
+                   const std::vector< LinePosArray > & planarLines )
+{
+
+    //remove the shapes so that they can be updated.
+    line_viewer->removeAllShapes( view1);
+    //update the point cloud
+    line_viewer->updatePointCloud( cloud, "cloud");
+
+    //print out the number of planes.
+    cout << "Number of Planes: " << planes.size() << endl;
+
+    //Display all of the edge lines in the line_viewer.
+    for( int i = 0; i < planarLines.size(); i ++ ){
+        const LinePosArray lines = planarLines[i];
+
+        //The every two points constitute a lines (two endpoints)
+        for ( int j = 0; j < lines.size() ; j += 2 ){
+            const pcl::PointXYZ start = lines[ j ];
+            const pcl::PointXYZ end   = lines[ j+1 ];
+            
+            cv::Vec3i color = colors[ (i / 2) % colors.size() ];
+            if ( i % 2 == 1 ){
+                color *= 0.2;
+            }
+            line_viewer->addLine(start, end,
+                            color[0], color[1], color[2],
+                            "line" +  to_string( j*100 +i ),
+                             view1 );
+        }
+    }
+}
+
+void EdgeDetector::drawHandle(){
+
+    cout << "handlePoints Size: " << handleIndices->size() << endl;
+    for ( int i = 0; i < 40 && i < handleIndices->size(); i ++ ){
+        const int a = rand() % handleIndices->size();
+        const int b = rand() % handleIndices->size();
+
+        const Point & p0 = curr_cloud->points[ handleIndices->at( a ) ];
+        const Point & p1 = curr_cloud->points[ handleIndices->at( b ) ];
+        
+        line_viewer->addLine(p0, p1, 0, 0, 255,
+                            "handleSecond" +  to_string( i ),
+                             view1 );
+
+
+        cout << "added handle lines" << endl;
+    
+    }
+    line_viewer->addLine( handleCoeffs, "handle", view1 );
+
+    line_viewer->spinOnce (100);
+}
 void EdgeDetector::makeDisplayImage(){
     if (displayImage.data == NULL ){
         displayImage = cv::Mat( planeImage.rows, planeImage.cols, CV_8UC3 );
@@ -576,7 +726,6 @@ void EdgeDetector::makeDisplayImage(){
 
 
 //initialize point cloud viewer
-/*
 void EdgeDetector::initViewer( const PointCloud::ConstPtr & cloud )
 {
 
@@ -591,7 +740,7 @@ void EdgeDetector::initViewer( const PointCloud::ConstPtr & cloud )
 
     //set up the color handler for the point cloud viewer. this will
     //enable showing color
-    ColorHandler rgb( cloud, "intensity" );  
+    ColorHandler rgb( cloud );  
      
     //create the dual view ports for the viewer.
     line_viewer->createViewPort( 0.0 , 0.0, 0.5, 1.0, view1 );
@@ -599,7 +748,7 @@ void EdgeDetector::initViewer( const PointCloud::ConstPtr & cloud )
      
     //Set up the cloud viewer;
     //  set the bg colors, camera position, coordinate system, and the 
-    line_viewer->addPointCloud<Point> ( cloud, rgb, "cloud", view2);
+    line_viewer->addPointCloud<Point> ( cloud, rgb,  "cloud", view2);
     line_viewer->setPointCloudRenderingProperties 
        (pcl::visualization::PCL_VISUALIZER_POINT_SIZE,
         1, "cloud", view2);
@@ -621,9 +770,64 @@ void EdgeDetector::initViewer( const PointCloud::ConstPtr & cloud )
     viewerIsInitialized = true;
 
 }
-*/
 
 
+//point cloud callback function gets new pointcloud and runs segmentation
+//algorithm
+void EdgeDetector::cloud_cb_ (const PointCloud::ConstPtr &cloud)
+{
+    curr_cloud = cloud;
+    if ( !viewerIsInitialized ){
+        initViewer( cloud );
+    }
+
+    if ( !line_viewer->wasStopped() ){
+        planes.clear();
+        std::vector< LinePosArray > planarLines;
+        if ( doWrite ){
+            savePointCloud( *cloud );
+        } else {
+            
+            segmenter.segment( cloud, planes, planarLines,
+                               planeImage, currentIntensityImage,
+                               image_viewer );
+        }
+        updateViewer( cloud, planarLines );
+    }
+    waitAndDisplay();
+    cout << "ended Call back\n";
+}
+
+//this program will run until the reader throws an error about 
+//a non-existant file.
+void EdgeDetector::runWithInputFile()
+{
+    while ( true ){
+        if ( !line_viewer->wasStopped() ){
+            planes.clear();
+            std::vector< LinePosArray > planarLines;
+            PointCloud::Ptr cloud (new PointCloud );
+            readPointCloud( cloud );
+            curr_cloud = cloud;
+
+            if ( !viewerIsInitialized ){
+                initViewer( cloud );
+            }
+
+            segmenter.segment( cloud, planes, planarLines,
+                               planeImage, currentIntensityImage,
+                               image_viewer );
+            updateViewer( cloud, planarLines );
+        }  
+        waitAndDisplay();       
+        cout << "waiting? " << waiting << endl; 
+    }
+
+}
+
+void EdgeDetector::run(){
+    std::cout << "Run does not work because it was taken out\n";
+}
 //aves pcd files from grabbed pointclouds
 void EdgeDetector::savePointCloud(const PointCloud & cloud)
 {
@@ -657,11 +861,30 @@ void EdgeDetector::readPointCloud(PointCloud::Ptr & cloud)
 }
 
 
+/*
+inline void EdgeDetector::convertColor( PointCloud::Ptr & cloud,
+                   cv::Mat & mat,
+                   pcl::PointIndices::Ptr inliers)
+{
+    cv::Mat newMat = mat.reshape( 1, mat.cols * mat.rows );
+    
+    for (int i = 0; i < inliers->indices.size(); i++)
+    {
+        uint8_t colorVal = newMat.at<uint8_t>( 
+                           inliers->indices[i] , 0 );
+
+        uint8_t r(255), g( 255 - colorVal ), b( 255 - colorVal );
+        uint32_t rgb = (static_cast<uint32_t>(r) << 16 |
+             static_cast<uint32_t>(g) << 8 | static_cast<uint32_t>(b));
+        cloud->points[i].rgb = *reinterpret_cast<float*>(&rgb);
+    }
+}
+*/
+
 
 //mouse click callback- currently prints out location of mouse click
 //on viewer
 //TODO: return plane that mouse click location is a member of
-/*
 void mouseClick(const pcl::visualization::MouseEvent &event,
                     void* detector)
 {  
@@ -687,7 +910,17 @@ void mouseClick(const pcl::visualization::MouseEvent &event,
     else if (event.getButton () == 
         pcl::visualization::MouseEvent::RightButton)
     {
-                
+        /*  Here we want to manually set a door handle by right clicking.
+         *  The door handle will not be within the door plane, so we want to
+         *  change our segmentation algorithm and have our door handle belong
+         *  to a different plane.
+         *  Method: pick two points to form a bounding rectangle around the
+         *  handle. For each point in the entire point cloud that exists
+         *  within this square, check to see whether it lies within the door
+         *  plane. If not, add it to a Handle object which contains points
+         *  that are a part of the handle.
+         */
+        
         cout << "Right Button" << endl;
 
         if (detect->handle0[0] == -1 || detect->handle0[1] == -1)
@@ -712,15 +945,14 @@ void mouseClick(const pcl::visualization::MouseEvent &event,
 
 } 
 
-*/
 
-/*
 //keyboard event handler callback
 void keyboardEventOccurred (const pcl::visualization::KeyboardEvent
                             &event, void* detector )
 {
     EdgeDetector * detect = ( EdgeDetector *) detector;
 
+    /*
     //show previous plane
     if (event.getKeySym () == "a" && event.keyDown ())
     {
@@ -746,7 +978,7 @@ void keyboardEventOccurred (const pcl::visualization::KeyboardEvent
         cout << "displaying next frame" << endl;
         detect->makeDisplayImage();
     }
-
+    */
     //pause and unpause
     if (event.getKeySym () == "p" && event.keyDown ())
     {
@@ -762,6 +994,6 @@ void keyboardEventOccurred (const pcl::visualization::KeyboardEvent
         }
     }
 }
-*/
+
 
 

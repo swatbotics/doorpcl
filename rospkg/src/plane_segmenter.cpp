@@ -139,8 +139,7 @@ void PlaneSegmenter::setFilterParams ( int blur, int filterSize,
 void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
                              std::vector< pcl::ModelCoefficients > & planes, 
                              std::vector< LinePosArray > & linePositions,
-                             cv::Mat & planeImage, cv::Mat & intensityImage,
-                             pcl::visualization::ImageViewer * viewer ) 
+                             cv::Mat & planeImage, cv::Mat & intensityImage ) 
 {   
     
     //if the camera parameters have not been set, the program will not work, so abort
@@ -194,7 +193,7 @@ void PlaneSegmenter::segment(const PointCloud::ConstPtr & cloud,
             //intensityLines vectors.
             LineArray planarLines;
             LineArray intensityLines;
-            findLines( inliers, cloud, planes, planarLines, intensityLines, viewer );
+            findLines( inliers, cloud, planes, planarLines, intensityLines );
      
             //transforms the lines in the plane into lines in space.
             linePositions.resize( linePositions.size() + 1 );
@@ -298,8 +297,7 @@ inline void PlaneSegmenter::findLines(
                  const PointCloud::ConstPtr & cloud,
                  std::vector< pcl::ModelCoefficients > & planes, 
                   LineArray & planarLines,
-                  LineArray & intensityLines,
-                  pcl::visualization::ImageViewer * viewer )
+                  LineArray & intensityLines)
 {
      
     cv::Mat binary, intensity, mask, copyBinary, copyIntensity, maskedIntensity;
@@ -375,42 +373,6 @@ inline void PlaneSegmenter::findLines(
                     intensity_thetaRes, intensity_threshold,
                     intensity_minLineLength, intensity_maxLineGap);
 
-
-    //if there is a viewer, then display a set of lines on the viewer.
-    if ( viewer != NULL ){     
-        cv::Mat cdst;
-
-        //TODO : make this a configurable option. Right now, this is simply
-        //a convenience mechanism.
-        bool seeBinary = true;
-
-        if ( seeBinary ){
-            cv::cvtColor(binary, cdst, CV_GRAY2BGR);
-
-            for( size_t i = 0; i < planarLines.size(); i++ )
-            {
-                cv::Vec4i l = planarLines[i];
-                cv::line( cdst, cv::Point(l[0], l[1]),
-                                cv::Point(l[2], l[3]),
-                                cv::Scalar(0,0,255),
-                                3, CV_AA);
-            }
-        }
-        else {
-            cv::cvtColor(maskedIntensity, cdst, CV_GRAY2BGR);
-
-            for( size_t i = 0; i < intensityLines.size(); i++ )
-            {
-                cv::Vec4i l = intensityLines[i];
-                cv::line( cdst, cv::Point(l[0], l[1]),
-                                cv::Point(l[2], l[3]),
-                                cv::Scalar(0,0,255),
-                                3, CV_AA);
-            }
-        }
-        viewer->showRGBImage( cdst.data, cdst.cols, cdst.rows );
-
-    }      
 }
 
 
